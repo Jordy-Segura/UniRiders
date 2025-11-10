@@ -4,15 +4,36 @@ window.API = API;
 const loginBtn = document.getElementById("loginBtn");
 const registerBtn = document.getElementById("registerBtn");
 const forgotLink = document.getElementById("forgotLink");
-const backToLogin = document.getElementById("backToLogin"); 
+const backToLogin = document.getElementById("backToLogin");
 const toast = document.getElementById("toast");
 
 const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const recoverForm = document.getElementById("recoverForm");
+const adminPhoneContainer = document.getElementById("adminPhoneContainer");
+const adminPhoneHelper = document.getElementById("adminPhoneHelper");
+const adminPhoneInput = document.getElementById("adminPhone");
 
 const sendCodeBtn = document.getElementById("sendCode");
 const resetPassBtn = document.getElementById("resetPass");
+
+const roleRadios = document.querySelectorAll('input[name="role"]');
+roleRadios.forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.checked && radio.value === 'administrador') {
+      if (adminPhoneContainer) adminPhoneContainer.style.display = 'flex';
+      if (adminPhoneHelper) adminPhoneHelper.style.display = 'block';
+      if (adminPhoneInput) adminPhoneInput.setAttribute('required', 'required');
+    } else if (radio.checked) {
+      if (adminPhoneContainer) adminPhoneContainer.style.display = 'none';
+      if (adminPhoneHelper) adminPhoneHelper.style.display = 'none';
+      if (adminPhoneInput) {
+        adminPhoneInput.value = '';
+        adminPhoneInput.removeAttribute('required');
+      }
+    }
+  });
+});
 
 function setButtonLoading(button, isLoading, loadingText = "Procesando...") {
   if (!button) return;
@@ -82,9 +103,15 @@ registerForm.addEventListener("submit", async e => {
   const password = document.getElementById("regPassword").value.trim();
   const confirm = document.getElementById("regConfirm").value.trim();
   const role = document.querySelector('input[name="role"]:checked').value;
+  const phone = adminPhoneInput ? adminPhoneInput.value.trim() : '';
 
   if (password !== confirm) {
     showToast("Las contraseñas no coinciden", false);
+    return;
+  }
+
+  if (role === 'administrador' && phone.length < 6) {
+    showToast("Ingresa un número de contacto válido", false);
     return;
   }
 
@@ -97,10 +124,14 @@ registerForm.addEventListener("submit", async e => {
   try {
     const submitBtn = registerForm.querySelector('button[type="submit"]');
     setButtonLoading(submitBtn, true, "Creando cuenta...");
+    const payload = { name, email, password, confirm, role };
+    if (phone) {
+      payload.phone = phone;
+    }
     const res = await fetch(`${API}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, confirm, role })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
@@ -251,8 +282,10 @@ loginForm.addEventListener("submit", async e => {
         localStorage.setItem('currentSessionId', sessionId);
         
         // REDIRECCIÓN CON SESSION ID
-        if (data.role === 'conductor') {
-            window.location.href = `conductor.html?sessionId=${sessionId}`; 
+        if (data.role === 'administrador') {
+            window.location.href = `admin.html?sessionId=${sessionId}`;
+        } else if (data.role === 'conductor') {
+            window.location.href = `conductor.html?sessionId=${sessionId}`;
         } else {
             window.location.href = `pasajero.html?sessionId=${sessionId}`;
         }
