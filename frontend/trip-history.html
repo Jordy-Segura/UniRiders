@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Viajes - UniRiders</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --color-azul: #0072ff;
+            --color-celeste: #00c6ff;
+            --color-verde-vibrante: #00c600;
+            --color-fondo: #f2f8ff;
+            --color-blanco: #fff;
+            --color-gris: #e0e0e0;
+            --color-gris-claro: #f0f0f0;
+            --color-oro: #FFD700;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Poppins', sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--color-azul), var(--color-celeste));
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+            transition: background 0.6s ease;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .summary-cards {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        @media (min-width: 600px) {
+            .summary-cards {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        .summary-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(8px);
+        }
+
+        .summary-card i {
+            font-size: 1.4em;
+            color: var(--color-oro);
+        }
+
+        .summary-card strong {
+            display: block;
+            font-size: 1.1em;
+        }
+
+        .summary-card span {
+            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 10px;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .header h1 {
+            font-size: 1.8em;
+            margin: 0;
+        }
+
+        .trip-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .trip-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .trip-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .trip-route {
+            flex-grow: 1;
+        }
+
+        .trip-route h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.1em;
+        }
+
+        .trip-status {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .status-pendiente { background: #ffaa00; color: #333; }
+        .status-activo { background: #4CAF50; color: white; }
+        .status-completado { background: #0072ff; color: white; }
+        .status-cancelado { background: #ff4444; color: white; }
+
+        .trip-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            color: #e0e0e0;
+        }
+
+        .trip-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8em;
+            color: #ccc;
+        }
+
+        .trip-cost {
+            font-weight: 600;
+            color: var(--color-oro);
+        }
+
+        .rating-stars {
+            color: var(--color-oro);
+        }
+
+        .no-trips {
+            text-align: center;
+            padding: 40px 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        .no-trips i {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.7;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Modal de detalles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+            margin: 20px auto;
+            padding: 0;
+            border-radius: 20px;
+            max-width: 800px;
+            color: white;
+            position: relative;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background 0.3s;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .trip-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .info-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .info-section h3 {
+            margin-bottom: 10px;
+            color: var(--color-celeste);
+            font-size: 1em;
+        }
+
+        .chat-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .chat-messages {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .chat-message.self {
+            background: rgba(0, 200, 0, 0.2);
+            margin-left: auto;
+            text-align: right;
+            border-bottom-right-radius: 2px;
+        }
+
+        .chat-message.other {
+            background: rgba(0, 100, 255, 0.2);
+            margin-right: auto;
+            text-align: left;
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-message.system {
+            background: rgba(255, 193, 7, 0.2);
+            text-align: center;
+            margin: 10px auto;
+            max-width: 90%;
+            font-style: italic;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            font-size: 0.85em;
+            margin-bottom: 3px;
+            color: #e0e0e0;
+        }
+
+        .message-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            flex: 1;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: var(--color-verde-vibrante);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--color-azul);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--color-oro);
+            color: #333;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .rating-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .star-rating {
+            font-size: 2em;
+            margin: 15px 0;
+            cursor: pointer;
+        }
+
+        .star-rating span {
+            color: #666;
+            transition: color 0.3s;
+            margin: 0 2px;
+        }
+
+        .star-rating span.active {
+            color: var(--color-oro);
+        }
+
+        .rating-comment {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.3);
+            color: white;
+            margin: 10px 0;
+            resize: vertical;
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo visual"></button>
+    <div class="floating-illustration" aria-hidden="true">
+        <i class="fas fa-motorcycle"></i>
+    </div>
+    <span class="animated-ripple" style="width: 260px; height: 260px; right: 10%; top: 14%;"></span>
+    <span class="animated-ripple" style="width: 180px; height: 180px; right: 5%; top: 26%; animation-delay: 4s;"></span>
+    <div class="container">
+        <div class="header">
+            <button class="back-btn" onclick="goBack()">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1><i class="fas fa-history"></i> Mis Últimos Viajes</h1>
+        </div>
+
+        <div class="summary-cards" id="historySummary">
+            <div class="summary-card">
+                <i class="fas fa-motorcycle"></i>
+                <div>
+                    <strong id="summaryTrips">--</strong>
+                    <span>Viajes registrados</span>
+                </div>
+            </div>
+            <div class="summary-card">
+                <i class="fas fa-clock"></i>
+                <div>
+                    <strong id="summaryLastTrip">--</strong>
+                    <span>Último viaje</span>
+                </div>
+            </div>
+            <div class="summary-card">
+                <i class="fas fa-star"></i>
+                <div>
+                    <strong id="summaryRating">--</strong>
+                    <span>Promedio recibido</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="tripsList">
+            <div class="loading">
+                <div class="loading-spinner"></div>
+                <p>Cargando viajes...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de detalles del viaje -->
+    <div id="tripModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Detalles del Viaje</h2>
+                <button class="close-btn" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Contenido dinámico -->
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="theme.js"></script>
+    <script>
+        const API = "http://localhost:3000/api";
+        
+        // Obtener datos de sesión
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sessionId') || localStorage.getItem('currentSessionId');
+        const userEmail = localStorage.getItem(sessionId + '_userEmail');
+        const userName = localStorage.getItem(sessionId + '_userName');
+        const userRole = localStorage.getItem(sessionId + '_userRole');
+
+        let currentTripDetails = null;
+
+        const summaryElements = {
+            trips: document.getElementById('summaryTrips'),
+            lastTrip: document.getElementById('summaryLastTrip'),
+            rating: document.getElementById('summaryRating')
+        };
+
+        function resetSummary() {
+            if (summaryElements.trips) summaryElements.trips.textContent = '0';
+            if (summaryElements.lastTrip) summaryElements.lastTrip.textContent = '--';
+            if (summaryElements.rating) summaryElements.rating.textContent = '--';
+        }
+
+        function updateSummary(trips) {
+            if (!Array.isArray(trips) || trips.length === 0) {
+                resetSummary();
+                return;
+            }
+
+            if (summaryElements.trips) {
+                summaryElements.trips.textContent = trips.length;
+            }
+
+            const latestTrip = trips.reduce((latest, trip) => {
+                if (!latest) return trip;
+                const latestDate = latest?.fecha_solicitud ? new Date(latest.fecha_solicitud) : null;
+                const currentDate = trip?.fecha_solicitud ? new Date(trip.fecha_solicitud) : null;
+                if (!currentDate) return latest;
+                if (!latestDate || currentDate > latestDate) return trip;
+                return latest;
+            }, null);
+            if (summaryElements.lastTrip) {
+                const date = latestTrip?.fecha_solicitud ? new Date(latestTrip.fecha_solicitud) : null;
+                const formatted = date ? date.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--';
+                summaryElements.lastTrip.textContent = formatted;
+            }
+
+            const ratingKey = (userRole === 'conductor') ? 'calificacion_pasajero' : 'calificacion_conductor';
+            const ratings = trips
+                .map(trip => parseFloat(trip[ratingKey]))
+                .filter(value => !Number.isNaN(value) && value > 0);
+
+            if (summaryElements.rating) {
+                if (ratings.length === 0) {
+                    summaryElements.rating.textContent = '--';
+                } else {
+                    const avg = ratings.reduce((sum, value) => sum + value, 0) / ratings.length;
+                    summaryElements.rating.textContent = avg.toFixed(1);
+                }
+            }
+        }
+
+        // Función para cargar historial de viajes
+        async function loadTripHistory() {
+            const tripsList = document.getElementById('tripsList');
+            resetSummary();
+
+            try {
+                const response = await fetch(`${API}/trips/history`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId
+                    }
+                });
+                
+                const trips = await response.json();
+
+                if (trips.length === 0) {
+                    resetSummary();
+                    tripsList.innerHTML = `
+                        <div class="no-trips">
+                            <i class="fas fa-motorcycle"></i>
+                            <h3>No hay viajes registrados</h3>
+                            <p>Cuando realices viajes, aparecerán aquí.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                tripsList.innerHTML = '';
+                updateSummary(trips);
+
+                trips.forEach(trip => {
+                    const tripCard = createTripCard(trip);
+                    tripsList.appendChild(tripCard);
+                });
+                
+            } catch (error) {
+                console.error('Error cargando historial:', error);
+                tripsList.innerHTML = `
+                    <div class="no-trips">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Error al cargar viajes</h3>
+                        <p>Intenta recargar la página.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Función para crear tarjeta de viaje
+        function createTripCard(trip) {
+            const card = document.createElement('div');
+            card.className = 'trip-card';
+            card.onclick = () => showTripDetails(trip.id_viaje || trip.id);
+            
+            const statusClass = getStatusClass(trip.estado);
+            const formattedDate = formatDate(trip.fecha_solicitud || trip.startTime);
+            const cost = trip.costo ? `$${trip.costo}` : 'Pendiente';
+            
+            const otherUser = userRole === 'conductor' ? trip.pasajero_email : trip.conductor_email;
+            const otherUserName = userRole === 'conductor' ? trip.nombre_pasajero : trip.nombre_conductor;
+            
+            card.innerHTML = `
+                <div class="trip-header">
+                    <div class="trip-route">
+                        <h3>${trip.origen} → ${trip.destino}</h3>
+                        <div class="trip-details">
+                            <div><i class="fas fa-user"></i> ${otherUserName || otherUser || 'Usuario'}</div>
+                            <div><i class="fas fa-money-bill-wave"></i> ${cost}</div>
+                        </div>
+                    </div>
+                    <div class="trip-status ${statusClass}">
+                        ${getStatusText(trip.estado)}
+                    </div>
+                </div>
+                <div class="trip-meta">
+                    <span><i class="fas fa-calendar"></i> ${formattedDate}</span>
+                    ${trip.calificacion_conductor || trip.calificacion_pasajero ? 
+                        `<span class="rating-stars">${'★'.repeat(trip.calificacion_conductor || trip.calificacion_pasajero)}</span>` : 
+                        '<span>Sin calificar</span>'
+                    }
+                </div>
+            `;
+            
+            return card;
+        }
+
+        // Función para mostrar detalles del viaje
+        async function showTripDetails(tripId) {
+            try {
+                const response = await fetch(`${API}/trips/${tripId}/details`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Viaje no encontrado');
+                }
+                
+                currentTripDetails = await response.json();
+                showModal(currentTripDetails);
+                
+            } catch (error) {
+                console.error('Error cargando detalles:', error);
+                showToast('Error al cargar detalles del viaje', false);
+            }
+        }
+
+        // Función para mostrar modal con detalles
+        function showModal(trip) {
+            const modal = document.getElementById('tripModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            const isCompleted = trip.estado === 'COMPLETADO';
+            const isActive = trip.estado === 'ACEPTADO';
+            const canRate = isCompleted && !hasRated(trip);
+            
+            modalBody.innerHTML = `
+                <div class="trip-info-grid">
+                    <div class="info-section">
+                        <h3><i class="fas fa-route"></i> Ruta</h3>
+                        <p><strong>Origen:</strong> ${trip.origen}</p>
+                        <p><strong>Destino:</strong> ${trip.destino}</p>
+                        <p><strong>Estado:</strong> <span class="trip-status ${getStatusClass(trip.estado)}">${getStatusText(trip.estado)}</span></p>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3><i class="fas fa-users"></i> Usuarios</h3>
+                        <p><strong>Pasajero:</strong> ${trip.nombre_pasajero || trip.pasajero_email}</p>
+                        <p><strong>Conductor:</strong> ${trip.nombre_conductor || trip.conductor_email || 'Pendiente'}</p>
+                        <p><strong>Método de pago:</strong> ${trip.metodo_pago || 'Efectivo'}</p>
+                    </div>
+                </div>
+                
+                <div class="info-section">
+                    <h3><i class="fas fa-info-circle"></i> Información del Viaje</h3>
+                    <p><strong>Solicitado:</strong> ${formatDateTime(trip.fecha_solicitud)}</p>
+                    ${trip.fecha_aceptacion ? `<p><strong>Aceptado:</strong> ${formatDateTime(trip.fecha_aceptacion)}</p>` : ''}
+                    ${trip.fecha_finalizacion ? `<p><strong>Finalizado:</strong> ${formatDateTime(trip.fecha_finalizacion)}</p>` : ''}
+                    ${trip.costo ? `<p><strong>Costo:</strong> $${trip.costo}</p>` : ''}
+                </div>
+                
+                ${trip.messages && trip.messages.length > 0 ? `
+                    <div class="chat-section">
+                        <h3><i class="fas fa-comments"></i> Historial de Chat</h3>
+                        <div class="chat-messages">
+                            ${trip.messages.map(msg => `
+                                <div class="chat-message ${getMessageClass(msg)}">
+                                    <div class="message-sender">${msg.sender}</div>
+                                    <div class="message-text">${msg.message}</div>
+                                    <div class="message-time">${msg.displayTime || formatTime(msg.timestamp)}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${canRate ? `
+                    <div class="rating-section">
+                        <h3><i class="fas fa-star"></i> Calificar ${userRole === 'conductor' ? 'Pasajero' : 'Conductor'}</h3>
+                        <div class="star-rating" id="starRating">
+                            <span onclick="setRating(1)">★</span>
+                            <span onclick="setRating(2)">★</span>
+                            <span onclick="setRating(3)">★</span>
+                            <span onclick="setRating(4)">★</span>
+                            <span onclick="setRating(5)">★</span>
+                        </div>
+                        <textarea class="rating-comment" id="ratingComment" placeholder="Comentario opcional..."></textarea>
+                        <button class="btn btn-warning" onclick="submitRating()">
+                            <i class="fas fa-star"></i> Enviar Calificación
+                        </button>
+                    </div>
+                ` : ''}
+                
+                <div class="action-buttons">
+                    ${isActive ? `
+                        <button class="btn btn-primary" onclick="resumeTrip(${trip.id_viaje || trip.id})">
+                            <i class="fas fa-play"></i> Reanudar Viaje
+                        </button>
+                    ` : ''}
+                    
+                    <button class="btn btn-secondary" onclick="closeModal()">
+                        <i class="fas fa-times"></i> Cerrar
+                    </button>
+                </div>
+            `;
+            
+            modal.style.display = 'block';
+        }
+
+        // Función para reanudar viaje activo - CORREGIDA
+        async function resumeTrip(tripId) {
+            try {
+                showToast('🔄 Reanudando viaje...', true);
+                
+                const response = await fetch(`${API}/trips/${tripId}/resume`, {
+                    method: 'POST',
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showToast('✅ Viaje reanudado. Redirigiendo...', true);
+                    
+                    // Cerrar el modal
+                    closeModal();
+                    
+                    // Redirigir después de un breve delay
+                    setTimeout(() => {
+                        if (userRole === 'conductor') {
+                            window.location.href = `conductor.html?sessionId=${sessionId}&resumeTrip=${tripId}`;
+                        } else {
+                            window.location.href = `pasajero.html?sessionId=${sessionId}&resumeTrip=${tripId}`;
+                        }
+                    }, 1500);
+                } else {
+                    throw new Error(data.message || 'No se pudo reanudar el viaje');
+                }
+                
+            } catch (error) {
+                console.error('Error reanudando viaje:', error);
+                showToast(`❌ ${error.message}`, false);
+            }
+        }
+
+        // Funciones auxiliares
+        function getStatusClass(status) {
+            const statusMap = {
+                'PENDIENTE': 'status-pendiente',
+                'ACEPTADO': 'status-activo',
+                'EN_CURSO': 'status-activo',
+                'COMPLETADO': 'status-completado',
+                'CANCELADO': 'status-cancelado',
+                'FINALIZADO': 'status-completado'
+            };
+            return statusMap[status] || 'status-pendiente';
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'PENDIENTE': 'Pendiente',
+                'ACEPTADO': 'En Curso',
+                'EN_CURSO': 'En Curso',
+                'COMPLETADO': 'Completado',
+                'CANCELADO': 'Cancelado',
+                'FINALIZADO': 'Completado'
+            };
+            return statusMap[status] || status;
+        }
+
+        function getMessageClass(message) {
+            if (message.type === 'system') return 'system';
+            return message.sender === userName ? 'self' : 'other';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function hasRated(trip) {
+            if (userRole === 'conductor') {
+                return trip.calificacion_pasajero;
+            } else {
+                return trip.calificacion_conductor;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('tripModal').style.display = 'none';
+        }
+
+        function goBack() {
+            if (userRole === 'conductor') {
+                window.location.href = `conductor.html?sessionId=${sessionId}`;
+            } else {
+                window.location.href = `pasajero.html?sessionId=${sessionId}`;
+            }
+        }
+
+        // Sistema de calificaciones
+        let currentRating = 0;
+
+        function setRating(rating) {
+            currentRating = rating;
+            const stars = document.querySelectorAll('#starRating span');
+            stars.forEach((star, index) => {
+                star.classList.toggle('active', index < rating);
+            });
+        }
+
+        async function submitRating() {
+            if (currentRating === 0) {
+                showToast('Selecciona una calificación', false);
+                return;
+            }
+
+            try {
+                const comment = document.getElementById('ratingComment').value;
+                const response = await fetch(`${API}/trips/${currentTripDetails.id_viaje}/rate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    },
+                    body: JSON.stringify({
+                        rating: currentRating,
+                        comment: comment,
+                        ratedBy: userRole === 'conductor' ? 'driver' : 'passenger'
+                    })
+                });
+
+                if (response.ok) {
+                    showToast('¡Gracias por tu calificación!', true);
+                    closeModal();
+                    loadTripHistory(); // Recargar historial
+                } else {
+                    throw new Error('Error al enviar calificación');
+                }
+            } catch (error) {
+                console.error('Error enviando calificación:', error);
+                showToast('Error al enviar calificación', false);
+            }
+        }
+
+        // Función para mostrar notificaciones
+        function showToast(message, success) {
+            const toast = document.getElementById('toast');
+            if (toast) {
+                toast.textContent = message;
+                toast.style.background = success ? 
+                    "linear-gradient(135deg, #4CAF50, #45a049)" : 
+                    "linear-gradient(135deg, #ff4444, #cc0000)";
+                toast.classList.add("show");
+                
+                setTimeout(() => toast.classList.remove("show"), 4000);
+            }
+        }
+
+        // Cerrar modal al hacer click fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('tripModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!userEmail || !userRole) {
+                showToast('Sesión no válida. Redirigiendo...', false);
+                setTimeout(() => window.location.href = 'Index.html', 2000);
+                return;
+            }
+            
+            loadTripHistory();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,2251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UniRiders - Conductor Premium 🏍️</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="conductor.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        /* Estilos específicos de la aplicación de Conductor */
+        :root {
+            --color-rojo-claro: #ff4d4d;
+            --color-verde-espoch: #4CAF50;
+            --color-azul: #0072ff;
+            --color-oro: #FFD700;
+        }
+        body {
+            background: linear-gradient(135deg, var(--color-azul), #00c6ff);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            text-align: center;
+            overflow-y: auto;
+            padding: 20px 0;
+        }
+        .main-panel {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            width: 90%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+        .header-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .status-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-btn {
+            background: var(--color-rojo-claro);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: 0.3s;
+        }
+        .status-btn.active {
+            background: var(--color-verde-espoch);
+        }
+        .status-dot {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background-color: var(--color-rojo-claro);
+            box-shadow: 0 0 10px var(--color-rojo-claro);
+            transition: background-color 0.5s, box-shadow 0.5s;
+        }
+        .status-dot.active {
+            background-color: var(--color-verde-espoch);
+            box-shadow: 0 0 10px var(--color-verde-espoch), 0 0 20px var(--color-verde-espoch);
+        }
+        .offers-panel {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        .offers-list {
+            max-height: 250px; 
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+        .offer-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: 0.3s;
+            border-left: 5px solid var(--color-verde-espoch);
+            position: relative;
+        }
+        .accept-btn {
+            background: var(--color-verde-espoch);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 10px;
+            transition: 0.3s;
+        }
+        .logout-btn {
+            background: white;
+            color: var(--color-azul);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            margin-top: 20px;
+            transition: 0.3s;
+        }
+        .profile-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: transform 0.3s;
+        }
+
+        /* Mapa de Google */
+        #map {
+            width: 100%;
+            height: 320px;
+            background-color: #f0f0f0;
+            margin-top: 20px;
+            border-radius: 15px;
+            overflow: hidden;
+            display: none;
+        }
+        #map.active {
+            display: block;
+        }
+        #map iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+        .navigation-actions {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+        }
+        .navigation-actions button {
+            border: none;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            background: var(--color-verde-espoch);
+            color: #fff;
+            transition: background 0.3s ease;
+        }
+        .navigation-actions button:disabled {
+            background: rgba(76, 175, 80, 0.5);
+            cursor: not-allowed;
+        }
+        .navigation-actions span {
+            font-size: 0.9em;
+            color: #f1f1f1;
+        }
+
+        /* Chat - ESTILOS MEJORADOS */
+        .chat-container {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: left;
+            display: none; 
+            position: relative;
+        }
+        .chat-container.active {
+            display: block;
+        }
+
+        #chatMessages {
+            max-height: 200px;
+            min-height: 150px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Estilos mejorados para los mensajes del chat */
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
+            transition: all 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.self {
+            background: rgba(0, 200, 0, 0.2);
+            margin-left: auto;
+            text-align: right;
+            border-bottom-right-radius: 2px;
+            border: 1px solid rgba(0, 200, 0, 0.3);
+        }
+
+        .chat-message.other {
+            background: rgba(0, 100, 255, 0.2);
+            margin-right: auto;
+            text-align: left;
+            border-bottom-left-radius: 2px;
+            border: 1px solid rgba(0, 100, 255, 0.3);
+        }
+
+        .chat-message.system {
+            background: rgba(255, 193, 7, 0.2) !important;
+            border: 1px solid rgba(255, 193, 7, 0.4) !important;
+            text-align: center !important;
+            margin: 10px auto !important;
+            max-width: 90% !important;
+            font-style: italic;
+        }
+
+        .chat-message .sender-name {
+            font-weight: 600;
+            font-size: 0.85em;
+            margin-bottom: 3px;
+            color: #e0e0e0;
+        }
+
+        .chat-message .message-text {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        .chat-message .message-time {
+            font-size: 0.7em;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+
+        .message-status {
+            font-size: 0.7em;
+            color: #4CAF50;
+            margin-left: 5px;
+        }
+
+        .chat-message.new-message {
+            animation: messagePop 0.3s ease-out;
+        }
+
+        @keyframes messagePop {
+            0% {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Scrollbar personalizado para el chat */
+        #chatMessages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        #chatMessages::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+
+        #chatMessages::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .chat-input-group input {
+            flex-grow: 1;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .chat-input-group input:focus {
+            border-color: var(--color-verde-espoch);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+        }
+
+        .chat-input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .chat-input-group button {
+            background: var(--color-verde-espoch);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .chat-input-group button:hover {
+            background: #45a049;
+            transform: translateY(-1px);
+        }
+
+        .chat-input-group button:active {
+            transform: translateY(0);
+        }
+
+        /* Indicador de escritura */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin: 5px 0;
+            font-style: italic;
+            color: #ccc;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 3px;
+        }
+
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: typingBounce 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typingBounce {
+            0%, 80%, 100% { 
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% { 
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Mensajes rápidos */
+        .quick-replies {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .quick-reply-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .quick-reply-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        /* Indicador de conexión */
+        .connection-status {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8em;
+            color: #4CAF50;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .driver-info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: left;
+            color: #eee;
+        }
+
+        /* Efectos hover mejorados */
+        .accept-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .logout-btn:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+
+        .profile-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .status-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Nuevos estilos para características premium */
+        .stats-panel {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 18px;
+            border-radius: 18px;
+            margin-top: 15px;
+            text-align: left;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin: 8px 0;
+            font-size: 0.9em;
+            align-items: center;
+        }
+
+        .stat-item i {
+            margin-right: 6px;
+            color: var(--color-oro);
+        }
+
+        .rating-stars {
+            color: var(--color-oro);
+            font-size: 1.1em;
+        }
+
+        .achievement-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--color-oro), #FFA500);
+            color: #333;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7em;
+            font-weight: bold;
+            margin-left: 8px;
+            animation: glow 2s infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px var(--color-oro); }
+            50% { box-shadow: 0 0 15px var(--color-oro); }
+        }
+
+        .pro-mode-indicator {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        /* Botones flotantes */
+        .floating-btn {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-btn {
+            bottom: 90px;
+            right: 20px;
+            background: var(--color-verde-espoch);
+        }
+
+        .emergency-btn {
+            bottom: 160px;
+            right: 20px;
+            background: var(--color-rojo-claro);
+            animation: pulse 2s infinite;
+        }
+
+        .stats-btn {
+            bottom: 230px;
+            right: 20px;
+            background: var(--color-azul);
+        }
+
+        .floating-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Panel de historial para conductor */
+        .history-panel {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 15px;
+            text-align: left;
+            display: none;
+        }
+        
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+
+        .mission-banner {
+            margin-top: 18px;
+            padding: 18px;
+            border-radius: 18px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        .mission-banner__copy h4 {
+            margin-bottom: 6px;
+            font-size: 1.1em;
+        }
+
+        .mission-banner__copy p {
+            margin: 0 0 12px 0;
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .mission-progress {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mission-progress__track {
+            position: relative;
+            width: 100%;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.15);
+            overflow: hidden;
+        }
+
+        .mission-progress__indicator {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #FFD700, #ff9f1c);
+            transition: width 0.6s ease;
+        }
+
+        .mission-progress__meta {
+            font-size: 0.8em;
+            display: flex;
+            gap: 10px;
+            align-items: baseline;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .mission-status-text {
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.18);
+            font-size: 0.75em;
+            letter-spacing: 0.3px;
+        }
+
+        .secondary-btn {
+            border: 1px solid rgba(255,255,255,0.4);
+            background: transparent;
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .secondary-btn:hover {
+            background: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+
+        .ride-preferences {
+            margin-top: 18px;
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(0, 0, 0, 0.25);
+            text-align: left;
+        }
+
+        .preferences-hint {
+            font-size: 0.85em;
+            color: rgba(255,255,255,0.75);
+            margin-bottom: 12px;
+        }
+
+        .preference-option {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .preference-option:last-child {
+            border-bottom: none;
+        }
+
+        .preference-option strong {
+            display: block;
+            font-size: 0.95em;
+        }
+
+        .preference-option span {
+            display: block;
+            font-size: 0.75em;
+            color: rgba(255,255,255,0.65);
+            margin-top: 4px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255,255,255,0.35);
+            transition: 0.4s;
+            border-radius: 26px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #fff;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        .switch input:checked + .slider {
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        }
+
+        .switch input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .journey-highlights {
+            margin-top: 18px;
+            padding: 20px;
+            border-radius: 18px;
+            background: rgba(0, 0, 0, 0.25);
+            text-align: left;
+        }
+
+        .journey-pills {
+            display: grid;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .journey-pill {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            padding: 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .journey-pill i {
+            font-size: 1.2em;
+            color: var(--color-oro);
+        }
+
+        .journey-pill strong {
+            font-size: 0.95em;
+        }
+
+        .journey-pill span {
+            font-size: 0.8em;
+            color: rgba(255,255,255,0.7);
+        }
+
+        .location-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.75em;
+            padding: 2px 6px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.16);
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo visual"></button>
+    <div class="floating-illustration floating-illustration--left floating-illustration--mini" aria-hidden="true">
+        <i class="fas fa-motorcycle"></i>
+    </div>
+    <span class="animated-ripple" style="width: 260px; height: 260px; left: 12%; top: 18%;"></span>
+    <span class="animated-ripple" style="width: 180px; height: 180px; left: 4%; top: 26%; animation-delay: 5s;"></span>
+    <!-- Botones flotantes -->
+    <button class="floating-btn voice-btn" onclick="toggleVoiceRecognition()">🎤</button>
+    <button class="floating-btn emergency-btn" onclick="handleEmergency()">🆘</button>
+    <button class="floating-btn stats-btn" onclick="showDriverHistory()">📊</button>
+
+    <div class="particles"></div>
+    <div class="main-panel">
+        <div class="header-section">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <img id="driverProfilePic" src="/img/default_avatar.jpg" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid white; object-fit: cover;">
+                <div>
+                    <h2 style="font-size: 1.5em; margin: 0;">
+                        <span id="userNameDisplay">Conductor</span> 
+                        <span class="pro-mode-indicator">PRO</span>
+                        <span class="achievement-badge">⭐ 4.8</span>
+                    </h2>
+                </div>
+            </div>
+            <div>
+                <button class="profile-btn">⚙️</button>
+                <div class="status-toggle">
+                    <div class="status-dot" id="statusDot"></div>
+                    <button class="status-btn" id="toggleStatusBtn">Activar servicio</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de estadísticas -->
+        <div class="stats-panel glass-effect" id="statsPanel">
+            <h4>📈 Mis Estadísticas</h4>
+            <div class="stat-item">
+                <span><i class="fas fa-road"></i> Viajes completados:</span>
+                <span id="completedTrips">0</span>
+            </div>
+            <div class="stat-item">
+                <span><i class="fas fa-star-half-alt"></i> Calificación promedio:</span>
+                <span class="rating-stars">★★★★★</span>
+            </div>
+            <div class="stat-item">
+                <span><i class="fas fa-wallet"></i> Ingresos totales:</span>
+                <span id="totalEarnings">$0.00</span>
+            </div>
+            <div class="stat-item">
+                <span><i class="fas fa-user-friends"></i> Pasajeros atendidos:</span>
+                <span id="passengersServed">0</span>
+            </div>
+        </div>
+
+        <div class="mission-banner glass-effect" id="missionBanner">
+            <div class="mission-banner__copy">
+                <h4>⚡ Desafío Relámpago</h4>
+                <p>Acepta 3 viajes hoy y gana la insignia <strong>Rider Relámpago</strong>.</p>
+                <div class="mission-progress">
+                    <div class="mission-progress__track">
+                        <span class="mission-progress__indicator" id="missionProgressIndicator"></span>
+                    </div>
+                    <div class="mission-progress__meta">
+                        <span id="missionTripsCompleted">0</span>/3 viajes
+                        <span class="mission-status-text" id="missionStatusText">En curso</span>
+                    </div>
+                </div>
+            </div>
+            <button class="secondary-btn" type="button" id="missionGuideBtn">Ver tips</button>
+        </div>
+
+        <div class="ride-preferences glass-effect" id="ridePreferences">
+            <h4>🧠 Preferencias inteligentes</h4>
+            <p class="preferences-hint">Personaliza cómo se comporta tu moto digital durante las rutas.</p>
+            <div class="preference-option">
+                <div>
+                    <strong>Autoaceptar viajes prioritarios</strong>
+                    <span>Detecta coincidencias inmediatas y confírmala sin tocar la pantalla.</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="autoAcceptToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="preference-option">
+                <div>
+                    <strong>Compartir ubicación en vivo</strong>
+                    <span>Comparte tu posición solo cuando quieras y mantén tus rutas privadas.</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="shareLocationToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="preference-option">
+                <div>
+                    <strong>Alertas inteligentes</strong>
+                    <span>Recibe notificaciones proactivas cuando aparezcan viajes relevantes.</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="smartAlertsToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="journey-highlights glass-effect" id="journeyHighlights">
+            <h4>🌟 Highlights del día</h4>
+            <div class="journey-pills">
+                <div class="journey-pill">
+                    <i class="fas fa-gas-pump"></i>
+                    <div>
+                        <strong>Mantenimiento rápido</strong>
+                        <span>Verifica presión de llantas antes de tu próximo viaje.</span>
+                    </div>
+                </div>
+                <div class="journey-pill">
+                    <i class="fas fa-stopwatch"></i>
+                    <div>
+                        <strong>Tiempo medio</strong>
+                        <span>Última ruta: <span id="averageTripTime">12 min</span></span>
+                    </div>
+                </div>
+                <div class="journey-pill">
+                    <i class="fas fa-gift"></i>
+                    <div>
+                        <strong>Recompensa semanal</strong>
+                        <span>Completa 10 viajes esta semana y desbloquea tokens.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel de historial para conductor -->
+        <div class="history-panel glass-effect" id="historyPanel">
+            <h4>📋 Mis Últimos Viajes</h4>
+            <div id="historyList">
+                <div class="history-item">
+                    <div>
+                        <strong>ESPOCH → Terminal</strong>
+                        <div style="font-size: 0.8em; color: #ccc;">Cargando...</div>
+                    </div>
+                    <div class="rating-stars" style="color: var(--color-oro);">-----</div>
+                </div>
+            </div>
+        </div>
+
+        <p id="geoStatus">Estado: Fuera de línea</p>
+
+        <div class="offers-panel" id="offersPanel">
+            <h3>🏍️ Ofertas de Viaje Recientes</h3>
+            <div class="offers-list" id="offersList">
+                <div class="no-offers">Activa tu servicio para ver viajes.</div>
+            </div>
+        </div>
+
+        <div id="activeTripPanel" class="main-panel" style="display: none; padding-top: 0; margin-top: 20px; max-width: 600px;">
+            <div class="connection-status">
+                <div class="connection-dot"></div>
+                <span>Conectado</span>
+            </div>
+            
+            <h3 style="margin-bottom: 15px;">Viaje Activo con <span id="activeTripPassengerName"></span></h3>
+            <div class="driver-info-panel">
+                <h4>Detalles del Viaje</h4>
+                <p>De: <strong id="activeTripOrigin"></strong> (<span id="activeTripOriginCoords"></span>)</p>
+                <p>A: <strong id="activeTripDestination"></strong> (<span id="activeTripDestinationCoords"></span>)</p>
+                <p>Pago: <strong id="activeTripPayment"></strong></p>
+                <p>Tiempo estimado: <strong id="estimatedTime">15 min</strong></p>
+            </div>
+            
+            <div id="map" class="active">
+                <iframe id="mapFrame" title="Mapa de ruta" loading="lazy" allowfullscreen></iframe>
+            </div>
+            <div class="navigation-actions" id="navigationActions" style="display: none;">
+                <button id="startNavigationBtn" disabled>▶️ Iniciar recorrido en Google Maps</button>
+                <span id="passengerLocationDisplay">Aún no se comparte la ubicación del pasajero.</span>
+            </div>
+            <p style="margin-top: 10px; font-size: 0.9em;">Tu ubicación actual: <span id="driverMapCoords"></span></p>
+
+            <div class="chat-container active">
+                <h4>💬 Chat con Pasajero</h4>
+                <div id="chatMessages"></div>
+                <div class="chat-input-group">
+                    <input type="text" id="chatInput" placeholder="Escribe un mensaje...">
+                    <button id="sendChatBtn">Enviar</button>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="status-btn" style="background: var(--color-verde-espoch); flex: 1;" onclick="markAsArrived()">
+                    ✅ Llegué
+                </button>
+                <button class="status-btn" style="background: var(--color-rojo-claro); flex: 1;" onclick="completeTrip()">
+                    🏁 Finalizar Viaje
+                </button>
+            </div>
+            
+        </div>
+
+        <button class="logout-btn" onclick="logout()">Cerrar Sesión</button>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="theme.js"></script>
+    <script>
+        const API = "http://localhost:3000/api";
+        
+        // OBTENER DATOS CON SISTEMA DE SESIONES
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('sessionId') || localStorage.getItem('currentSessionId');
+        const userName = localStorage.getItem(sessionId + '_userName') || 'Conductor';
+        const userEmail = localStorage.getItem(sessionId + '_userEmail');
+        const userRole = localStorage.getItem(sessionId + '_userRole');
+
+        document.getElementById('userNameDisplay').innerText = userName.split(' ')[0]; 
+
+        const toggleStatusBtn = document.getElementById('toggleStatusBtn');
+        const statusDot = document.getElementById('statusDot');
+        const offersPanel = document.getElementById('offersPanel');
+        const activeTripPanel = document.getElementById('activeTripPanel');
+        const mapElement = document.getElementById('map');
+        const mapFrame = document.getElementById('mapFrame');
+        const navigationActions = document.getElementById('navigationActions');
+        const startNavigationBtn = document.getElementById('startNavigationBtn');
+        const passengerLocationDisplay = document.getElementById('passengerLocationDisplay');
+        const driverMapCoords = document.getElementById('driverMapCoords');
+        const missionProgressIndicator = document.getElementById('missionProgressIndicator');
+        const missionTripsCompleted = document.getElementById('missionTripsCompleted');
+        const missionStatusText = document.getElementById('missionStatusText');
+        const missionGuideBtn = document.getElementById('missionGuideBtn');
+        const preferenceElements = {
+            autoAccept: document.getElementById('autoAcceptToggle'),
+            shareLocation: document.getElementById('shareLocationToggle'),
+            smartAlerts: document.getElementById('smartAlertsToggle')
+        };
+        const driverName = userName;
+
+        const preferenceKey = userEmail ? `driverPrefs_${userEmail}` : 'driverPrefs_guest';
+        let driverPreferences = { autoAccept: false, shareLocation: true, smartAlerts: true };
+
+        try {
+            const storedPreferences = JSON.parse(localStorage.getItem(preferenceKey));
+            if (storedPreferences) {
+                driverPreferences = { ...driverPreferences, ...storedPreferences };
+            }
+        } catch (error) {
+            console.warn('No se pudieron cargar preferencias previas', error);
+        }
+
+        function persistPreferences() {
+            localStorage.setItem(preferenceKey, JSON.stringify(driverPreferences));
+        }
+
+        Object.entries(preferenceElements).forEach(([key, input]) => {
+            if (!input) return;
+            input.checked = !!driverPreferences[key];
+            input.addEventListener('change', () => {
+                driverPreferences[key] = input.checked;
+                persistPreferences();
+
+                if (key === 'shareLocation') {
+                    showToast(input.checked ? '📡 Ubicación compartida con los pasajeros.' : '🙈 Ubicación privada temporalmente.', true);
+                    simulateGeolocation();
+                }
+                if (key === 'autoAccept' && input.checked) {
+                    showToast('🤖 Autoaceptación activada. Nos encargamos de los mejores viajes.', true);
+                }
+            });
+        });
+
+        missionGuideBtn?.addEventListener('click', () => {
+            showToast('Tip: mantén tu moto visible y acepta viajes consecutivos para desbloquear bonificaciones ⚡', true);
+        });
+
+        let isActive = false;
+        let currentTrip = null;
+
+        let lastKnownDriverLocation = null;
+        let passengerCurrentLocation = null;
+        let passengerLocationPolling = null;
+        let currentChatInterval = null;
+        let typingTimeout = null;
+        let isTyping = false;
+        let voiceRecognition = null;
+        let lastAutoAcceptedId = null;
+        let lastOffersCount = 0;
+
+        if (startNavigationBtn) {
+            startNavigationBtn.addEventListener('click', openGoogleMapsNavigation);
+        }
+
+        if (startNavigationBtn) {
+            startNavigationBtn.addEventListener('click', openGoogleMapsNavigation);
+        }
+
+        // =============================================
+        // FUNCIONALIDADES MEJORADAS PARA CONDUCTORES
+        // =============================================
+
+        // Función mejorada para cargar historial del conductor
+        async function loadDriverTripHistory() {
+            try {
+                const res = await fetch(`${API}/trips/history`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId
+                    }
+                });
+                
+                const history = await res.json();
+                const historyList = document.getElementById('historyList');
+                
+                if (history.length === 0) {
+                    historyList.innerHTML = '<div style="text-align: center; color: #ccc; padding: 20px;">No hay viajes anteriores</div>';
+                    return;
+                }
+                
+                historyList.innerHTML = '';
+                history.forEach(trip => {
+                    const historyItem = document.createElement('div');
+                    historyItem.className = 'history-item';
+                    
+                    const stars = trip.calificacion_pasajero ? 
+                        '★'.repeat(trip.calificacion_pasajero) + '☆'.repeat(5 - trip.calificacion_pasajero) : 
+                        '★★★★★';
+                    
+                    const tripDate = new Date(trip.fecha_solicitud);
+                    const formattedDate = tripDate.toLocaleDateString('es-ES', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    
+                    historyItem.innerHTML = `
+                        <div>
+                            <strong>${trip.origen} → ${trip.destino}</strong>
+                            <div style="font-size: 0.8em; color: #ccc;">
+                                ${formattedDate}
+                                ${trip.estado === 'COMPLETADO' ? ' - Completado' : ' - En curso'}
+                                ${trip.costo ? ` - $${trip.costo}` : ''}
+                            </div>
+                        </div>
+                        <div class="rating-stars" style="color: var(--color-oro);">${stars}</div>
+                    `;
+                    
+                    historyList.appendChild(historyItem);
+                });
+                
+            } catch (error) {
+                console.error('Error cargando historial conductor:', error);
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '<div style="text-align: center; color: #ccc; padding: 20px;">Error cargando historial</div>';
+            }
+        }
+
+        // Función para mostrar historial detallado del conductor
+        function showDriverHistory() {
+            // Redirigir a la página central de historial con la sesión actual
+            window.location.href = `trip-history.html?sessionId=${sessionId}`;
+        }
+
+        // Sistema de comandos de voz
+        function setupVoiceRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                voiceRecognition = new SpeechRecognition();
+                voiceRecognition.continuous = false;
+                voiceRecognition.lang = 'es-ES';
+                voiceRecognition.interimResults = false;
+
+                voiceRecognition.onresult = (event) => {
+                    const command = event.results[0][0].transcript.toLowerCase();
+                    handleVoiceCommand(command);
+                };
+
+                voiceRecognition.onerror = (event) => {
+                    console.log('Error en reconocimiento de voz:', event.error);
+                };
+            }
+        }
+
+        function toggleVoiceRecognition() {
+            if (voiceRecognition) {
+                try {
+                    voiceRecognition.start();
+                    showToast('🎤 Escuchando... Di "activar servicio" o "finalizar viaje"', true);
+                    
+                    // Detener automáticamente después de 5 segundos
+                    setTimeout(() => {
+                        if (voiceRecognition) {
+                            voiceRecognition.stop();
+                        }
+                    }, 5000);
+                } catch (error) {
+                    showToast('❌ Error al activar el micrófono', false);
+                }
+            } else {
+                showToast('❌ Reconocimiento de voz no disponible', false);
+            }
+        }
+
+        function handleVoiceCommand(command) {
+            console.log('Comando de voz:', command);
+            
+            if (command.includes('activar servicio') || command.includes('conectarse')) {
+                if (!isActive) {
+                    toggleStatusBtn.click();
+                    showToast('✅ Servicio activado por voz', true);
+                }
+            } else if (command.includes('desactivar servicio') || command.includes('desconectarse')) {
+                if (isActive) {
+                    toggleStatusBtn.click();
+                    showToast('✅ Servicio desactivado por voz', true);
+                }
+            } else if (command.includes('aceptar viaje') || command.includes('tomar viaje')) {
+                const acceptBtn = document.querySelector('.accept-btn');
+                if (acceptBtn) {
+                    acceptBtn.click();
+                    showToast('✅ Viaje aceptado por voz', true);
+                }
+            } else if (command.includes('llegué') || command.includes('he llegado')) {
+                markAsArrived();
+            } else if (command.includes('finalizar viaje') || command.includes('terminar viaje')) {
+                completeTrip();
+            } else if (command.includes('historial') || command.includes('mis viajes')) {
+                showDriverHistory();
+            } else {
+                showToast('❌ Comando no reconocido: ' + command, false);
+            }
+        }
+
+        // Botón de emergencia
+        function handleEmergency() {
+            if (confirm('🚨 ¿ESTÁS EN UNA SITUACIÓN DE EMERGENCIA?\n\nSe enviará tu ubicación a los contactos de emergencia y se notificará a las autoridades.')) {
+                // Simular envío de alerta
+                const location = driverMarker ? driverMarker.getLatLng() : { lat: -1.65, lng: -78.68 };
+                
+                fetch(`${API}/emergency/alert`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userEmail: userEmail,
+                        location: location,
+                        message: 'Alerta de emergencia desde la app UniRiders',
+                        tripId: currentTrip ? currentTrip.id : null
+                    })
+                }).then(() => {
+                    showToast('🚨 ALERTA DE EMERGENCIA ENVIADA', false);
+                    
+                    // Vibrar dispositivo si es compatible
+                    if (navigator.vibrate) {
+                        navigator.vibrate([500, 200, 500, 200, 500]);
+                    }
+                    
+                    // Sonido de alerta (simulado)
+                    playEmergencySound();
+                }).catch(error => {
+                    showToast('✅ Alerta enviada (modo offline)', false);
+                });
+            }
+        }
+
+        function playEmergencySound() {
+            // En una implementación real, aquí se reproduciría un sonido
+            console.log('🔊 Reproduciendo sonido de emergencia');
+        }
+
+        function updateMissionProgress(completedTrips) {
+            if (!missionProgressIndicator || !missionTripsCompleted || !missionStatusText) return;
+
+            const missionTarget = 3;
+            const progressCount = completedTrips === 0 ? 0 : completedTrips % missionTarget || missionTarget;
+            const percentage = Math.min((progressCount / missionTarget) * 100, 100);
+
+            missionProgressIndicator.style.width = `${percentage}%`;
+            missionTripsCompleted.textContent = progressCount;
+
+            if (completedTrips === 0) {
+                missionStatusText.textContent = 'Empieza ahora';
+            } else if (progressCount >= missionTarget) {
+                missionStatusText.textContent = 'Meta cumplida';
+            } else {
+                missionStatusText.textContent = `${missionTarget - progressCount} pendientes`;
+            }
+        }
+
+        // Estadísticas del conductor con datos reales
+        async function showDriverStats() {
+            try {
+                const res = await fetch(`${API}/stats/driver/${userEmail}`);
+                const stats = await res.json();
+
+                document.getElementById('completedTrips').textContent = stats.completedTrips;
+                document.getElementById('totalEarnings').textContent = '$' + stats.totalEarnings;
+                document.getElementById('passengersServed').textContent = stats.completedTrips;
+
+                updateMissionProgress(Number(stats.completedTrips || 0));
+
+                const averageTripTimeEl = document.getElementById('averageTripTime');
+                if (averageTripTimeEl) {
+                    const simulatedAverage = Math.max(8, 18 - Math.min(Number(stats.completedTrips || 0), 10));
+                    averageTripTimeEl.textContent = `${simulatedAverage} min`;
+                }
+
+                // Actualizar estrellas según rating
+                const ratingStars = document.querySelector('.rating-stars');
+                if (ratingStars) {
+                    const rating = parseFloat(stats.avgRating);
+                    const fullStars = Math.floor(rating);
+                    const hasHalfStar = rating % 1 >= 0.5;
+                    let stars = '★'.repeat(fullStars);
+                    if (hasHalfStar) stars += '½';
+                    stars += '☆'.repeat(5 - fullStars - (hasHalfStar ? 1 : 0));
+                    ratingStars.innerHTML = stars;
+                }
+
+                // Actualizar badge visible en el header (antes estaba estático)
+                const headerBadge = document.querySelector('.achievement-badge');
+                if (headerBadge && stats.avgRating != null) {
+                    headerBadge.textContent = `⭐ ${parseFloat(stats.avgRating).toFixed(1)}`;
+                }
+                
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+                updateMissionProgress(0);
+            }
+        }
+
+        // Sistema de calificaciones
+        function showRatingModal() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 10000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 15px; text-align: center; max-width: 400px; color: #333;">
+                    <h3>⭐ Califica a tu pasajero</h3>
+                    <p>¿Cómo fue tu experiencia con <strong>${currentTrip ? currentTrip.passenger : 'el pasajero'}</strong>?</p>
+                    <div class="star-rating" style="font-size: 2em; margin: 20px 0;">
+                        ${'★'.repeat(5).split('').map((star, i) => 
+                            `<span style="color: #ccc; cursor: pointer; transition: color 0.3s;" 
+                                  onmouseover="highlightStars(this, ${i})" 
+                                  onclick="submitPassengerRating(${i + 1})">${star}</span>`
+                        ).join('')}
+                    </div>
+                    <textarea id="ratingComment" placeholder="Comentario opcional..." 
+                              style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin: 10px 0; resize: vertical;"></textarea>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="skipRating()" 
+                                style="background: #ccc; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; flex: 1;">
+                            Saltar
+                        </button>
+                        <button onclick="submitPassengerRating()" 
+                                style="background: var(--color-verde-espoch); color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; flex: 1;">
+                            Enviar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            window.highlightStars = (element, index) => {
+                const stars = element.parentElement.children;
+                for (let i = 0; i < stars.length; i++) {
+                    stars[i].style.color = i <= index ? '#FFD700' : '#ccc';
+                }
+            };
+        }
+
+        function submitPassengerRating(rating = 0) {
+            const comment = document.getElementById('ratingComment')?.value || '';
+            
+            if (currentTrip) {
+                fetch(`${API}/trips/${currentTrip.id}/rate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rating: rating,
+                        comment: comment,
+                        ratedBy: 'driver'
+                    })
+                }).then(() => {
+                    showToast('⭐ Calificación enviada. ¡Gracias!', true);
+                });
+            }
+            
+            // Cerrar modal
+            document.querySelector('div[style*="position: fixed"]')?.remove();
+        }
+
+        function skipRating() {
+            document.querySelector('div[style*="position: fixed"]')?.remove();
+            showToast('Puedes calificar más tarde en tu historial', true);
+        }
+
+        function markAsArrived() {
+            showToast('📍 Marcado como llegado. El pasajero ha sido notificado.', true);
+            
+            // Enviar mensaje automático al pasajero
+            if (currentTrip) {
+                fetch(`${API}/chat/${currentTrip.id}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender: "Sistema UniRiders",
+                        message: "🏍️ El conductor ha llegado al punto de encuentro",
+                        type: "system"
+                    })
+                });
+            }
+        }
+
+        // =============================================
+        // CÓDIGO EXISTENTE (MEJORADO)
+        // =============================================
+
+        // Cargar foto de perfil desde la base de datos
+        function loadDriverProfilePhoto() {
+            const driverProfilePic = document.getElementById('driverProfilePic');
+            
+            if (userEmail && driverProfilePic) {
+                const timestamp = new Date().getTime();
+                driverProfilePic.src = `http://localhost:3000/api/profile/${userEmail}/photo?t=${timestamp}`;
+            }
+        }
+
+        // Navegación al perfil
+        document.querySelector('.profile-btn').onclick = () => {
+             window.location.href = `profile.html?role=${userRole}&email=${userEmail}&sessionId=${sessionId}`;
+        };
+
+        // Cerrar sesión
+        async function logout() {
+            try {
+                await fetch(`${API}/logout`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    }
+                });
+            } catch (error) {
+                console.log('Error al cerrar sesión en servidor:', error);
+            }
+            
+            // Limpiar datos de esta sesión
+            if (sessionId) {
+                localStorage.removeItem(sessionId + '_userEmail');
+                localStorage.removeItem(sessionId + '_userName');
+                localStorage.removeItem(sessionId + '_userRole');
+                localStorage.removeItem('currentSessionId');
+            }
+            
+            window.location.href = 'Index.html';
+        }
+
+        // Lógica de geolocalización y mapa (Google Maps embebido)
+        function simulateGeolocation(callback) {
+            const applyPosition = (latitude, longitude) => {
+                const coords = {
+                    lat: parseFloat(latitude.toFixed(5)),
+                    lon: parseFloat(longitude.toFixed(5))
+                };
+
+                const locationHint = driverPreferences.shareLocation ? '' : ' <span class="location-hint">(modo privado)</span>';
+                geoStatus.innerHTML = `📍 <strong>Ubicación:</strong> Lat: ${coords.lat}, Lon: ${coords.lon}${locationHint}`;
+                driverMapCoords.innerText = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
+
+                lastKnownDriverLocation = coords;
+                updateDriverMap();
+                updateNavigationAvailability();
+
+                if (typeof callback === 'function') {
+                    callback(coords);
+                }
+            };
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    applyPosition(position.coords.latitude, position.coords.longitude);
+                }, () => {
+                    generateFallbackPosition(applyPosition);
+                }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 10000 });
+            } else {
+                generateFallbackPosition(applyPosition);
+            }
+        }
+
+        function generateFallbackPosition(applyPosition) {
+            const baseLat = -1.65;
+            const baseLon = -78.68;
+            const offset = (Math.random() - 0.5) * 0.005;
+            applyPosition(baseLat + offset, baseLon + offset * 2);
+        }
+
+        function initMap() {
+            if (mapFrame) {
+                mapFrame.src = buildGoogleMapsUrl({ lat: -1.65, lon: -78.68 });
+            }
+        }
+
+        function buildGoogleMapsUrl(pointA, pointB) {
+            const baseUrl = 'https://maps.google.com/maps';
+            const params = new URLSearchParams({
+                hl: 'es',
+                t: 'm',
+                output: 'embed'
+            });
+
+            if (pointA && pointB) {
+                params.set('f', 'd');
+                params.set('source', 's_d');
+                params.set('saddr', `${pointA.lat},${pointA.lon}`);
+                params.set('daddr', `${pointB.lat},${pointB.lon}`);
+                params.set('z', '14');
+            } else if (pointA) {
+                params.set('q', `${pointA.lat},${pointA.lon}`);
+                params.set('z', '15');
+            }
+
+            return `${baseUrl}?${params.toString()}`;
+        }
+
+        function updateDriverMap() {
+            if (!mapFrame) return;
+
+            if (lastKnownDriverLocation && passengerCurrentLocation) {
+                mapFrame.src = buildGoogleMapsUrl(lastKnownDriverLocation, passengerCurrentLocation);
+            } else if (lastKnownDriverLocation) {
+                mapFrame.src = buildGoogleMapsUrl(lastKnownDriverLocation);
+            }
+        }
+
+        function updateNavigationAvailability() {
+            if (navigationActions) {
+                navigationActions.style.display = currentTrip ? 'flex' : 'none';
+            }
+
+            if (startNavigationBtn) {
+                const canNavigate = !!(lastKnownDriverLocation && passengerCurrentLocation);
+                startNavigationBtn.disabled = !canNavigate;
+            }
+
+            if (passengerLocationDisplay) {
+                if (passengerCurrentLocation) {
+                    passengerLocationDisplay.innerText = `Pasajero: Lat ${passengerCurrentLocation.lat.toFixed(5)}, Lon ${passengerCurrentLocation.lon.toFixed(5)}`;
+                } else {
+                    passengerLocationDisplay.innerText = 'Aún no se comparte la ubicación del pasajero.';
+                }
+            }
+        }
+
+        function openGoogleMapsNavigation() {
+            if (!lastKnownDriverLocation || !passengerCurrentLocation) {
+                showToast('Necesitamos ambas ubicaciones para abrir Google Maps.', false);
+                return;
+            }
+
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${lastKnownDriverLocation.lat},${lastKnownDriverLocation.lon}&destination=${passengerCurrentLocation.lat},${passengerCurrentLocation.lon}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        function parseCoordsFromText(coordText) {
+            if (!coordText) return null;
+            const matches = coordText.match(/-?\d+(?:\.\d+)?/g);
+            if (!matches || matches.length < 2) return null;
+            return {
+                lat: parseFloat(matches[0]),
+                lon: parseFloat(matches[1])
+            };
+        }
+
+        async function startPassengerLocationPolling(tripId) {
+            if (passengerLocationPolling) clearInterval(passengerLocationPolling);
+
+            const fetchLocation = async () => {
+                try {
+                    const res = await fetch(`${API}/trips/${tripId}/passengerLocation`, {
+                        headers: {
+                            'user-email': userEmail,
+                            'session-id': sessionId
+                        }
+                    });
+
+                    if (res.status === 404) {
+                        passengerCurrentLocation = passengerCurrentLocation || null;
+                        updateNavigationAvailability();
+                        return;
+                    }
+
+                    if (!res.ok) return;
+
+                    const data = await res.json();
+                    if (data && data.lat && data.lon) {
+                        passengerCurrentLocation = {
+                            lat: parseFloat(data.lat),
+                            lon: parseFloat(data.lon)
+                        };
+                        updateDriverMap();
+                        updateNavigationAvailability();
+                    }
+                } catch (error) {
+                    console.error('Error al obtener ubicación del pasajero:', error);
+                }
+            };
+
+            await fetchLocation();
+            passengerLocationPolling = setInterval(fetchLocation, 5000);
+        }
+
+        // Lógica de ofertas y chat
+        async function fetchTripOffers() {
+            if (!isActive || currentTrip) return;
+
+            try {
+                const res = await fetch(`${API}/trips/offers`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    }
+                });
+                const offers = await res.json();
+                
+                offersList.innerHTML = '';
+
+                if (offers.length === 0) {
+                    offersList.innerHTML = '<div class="no-offers">🎉 ¡No hay viajes pendientes!</div>';
+                    lastOffersCount = 0;
+                    lastAutoAcceptedId = null;
+                    return;
+                }
+
+                offers.forEach(offer => {
+                    const card = document.createElement('div');
+                    card.classList.add('offer-card');
+                    card.setAttribute('data-trip-id', offer.id);
+
+                    card.innerHTML = `
+                        <h4>🏍️ Viaje ID: ${offer.id} <span style="font-weight: 400; font-size: 0.9em;">(${offer.timestamp})</span></h4>
+                        <p>📍 De: <strong>${offer.origin}</strong></p>
+                        <p>🏁 A: <strong>${offer.destination}</strong></p>
+                        <p>👤 Pasajero: ${offer.passenger} | 💰 Pago: <strong>${offer.payment}</strong></p>
+                        <button class="accept-btn" onclick="acceptTrip(${offer.id})">✅ Aceptar Viaje</button>
+                    `;
+                    offersList.appendChild(card);
+                    gsap.from(card, { opacity: 0, y: 20, duration: 0.5, ease: "back.out(1.2)" });
+                });
+
+                if (driverPreferences.smartAlerts && offers.length > lastOffersCount) {
+                    showToast('🏍️ Nueva oferta disponible para tu moto.', true);
+                }
+
+                if (driverPreferences.autoAccept && offers.length > 0) {
+                    const candidateId = offers[0].id;
+                    if (lastAutoAcceptedId !== candidateId) {
+                        lastAutoAcceptedId = candidateId;
+                        showToast('🤖 Autoaceptando el viaje destacado.', true);
+                        setTimeout(() => acceptTrip(candidateId), 700);
+                    }
+                }
+
+                lastOffersCount = offers.length;
+
+            } catch (error) {
+                console.error("Error al obtener ofertas:", error);
+                offersList.innerHTML = '<div class="no-offers">❌ Error al cargar ofertas.</div>';
+            }
+        }
+
+        async function acceptTrip(tripId) {
+            console.log("🟡 Intentando aceptar viaje ID:", tripId, "Tipo:", typeof tripId);
+            
+            try {
+                const res = await fetch(`${API}/trips/accept`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    },
+                    body: JSON.stringify({ 
+                        tripId: parseInt(tripId), 
+                        driverName: driverName,
+                        driverEmail: userEmail
+                    })
+                });
+
+                const data = await res.json();
+                console.log("🟡 Respuesta del servidor:", data);
+
+                if (res.ok) {
+                    currentTrip = data.trip;
+                    
+                    offersPanel.style.display = 'none';
+                    activeTripPanel.style.display = 'block';
+                    mapElement.classList.add('active');
+
+                    document.getElementById('activeTripPassengerName').innerText = currentTrip.passenger;
+                    document.getElementById('activeTripOrigin').innerText = currentTrip.origin;
+                    document.getElementById('activeTripOriginCoords').innerText = `(${currentTrip.originCoords})`;
+                    document.getElementById('activeTripDestination').innerText = currentTrip.destination;
+                    document.getElementById('activeTripDestinationCoords').innerText = `(${currentTrip.destinationCoords})`;
+                    document.getElementById('activeTripPayment').innerText = currentTrip.payment;
+
+                    const originCoords = parseCoordsFromText(currentTrip.originCoords);
+                    if (originCoords) {
+                        passengerCurrentLocation = { lat: originCoords.lat, lon: originCoords.lon };
+                        updateDriverMap();
+                    }
+                    updateNavigationAvailability();
+
+                    startPassengerLocationPolling(currentTrip.id);
+
+                    startChatSession(currentTrip.id);
+
+                    showToast(`✅ Viaje ${tripId} aceptado! Dirígete a recoger a ${currentTrip.passenger}.`, true);
+                } else {
+                    alert('Error al aceptar el viaje: ' + data.message);
+                    fetchTripOffers(); 
+                }
+            } catch (error) {
+                console.error('🔴 Error al aceptar el viaje:', error);
+                alert('Error de conexión al aceptar el viaje. Revisa la consola para más detalles.');
+            }
+        }
+        window.acceptTrip = acceptTrip; 
+        
+        // Función para finalizar viaje (reemplaza la existente)
+        async function completeTrip() {
+            if (!currentTrip) return;
+            
+            if (confirm("¿Estás seguro de que quieres finalizar el viaje?")) {
+                try {
+                    const res = await fetch(`${API}/trips/complete`, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'session-id': sessionId
+                        },
+                        body: JSON.stringify({ 
+                            tripId: currentTrip.id,
+                            driverEmail: userEmail
+                        })
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (res.ok) {
+                        showToast(`🏁 Viaje finalizado. Costo: $${data.cost}`, true);
+                        
+                        // Mostrar modal de calificación
+                        setTimeout(() => {
+                            showRatingModal();
+                        }, 1000);
+                        
+                        // Limpiar chat después de un delay
+                        setTimeout(async () => {
+                            await fetch(`${API}/chat/${currentTrip.id}/clear`, {
+                                method: 'POST'
+                            });
+                        }, 5000);
+                        
+                    } else {
+                        showToast(data.message, false);
+                    }
+                    
+                } catch (error) {
+                    console.error('Error finalizando viaje:', error);
+                    showToast('Error al finalizar viaje', false);
+                }
+                
+                // Resetear UI
+                currentTrip = null;
+                clearInterval(currentChatInterval);
+                currentChatInterval = null;
+                document.querySelector('.chat-container').classList.remove('active');
+                if (passengerLocationPolling) {
+                    clearInterval(passengerLocationPolling);
+                    passengerLocationPolling = null;
+                }
+                passengerCurrentLocation = null;
+                updateNavigationAvailability();
+                if (mapFrame) {
+                    mapFrame.src = buildGoogleMapsUrl({ lat: -1.65, lon: -78.68 });
+                }
+                mapElement.classList.remove('active');
+
+                activeTripPanel.style.display = 'none';
+                offersPanel.style.display = 'block';
+                fetchTripOffers();
+                
+                // Actualizar estadísticas
+                showDriverStats();
+                loadDriverTripHistory();
+            }
+        }
+        window.completeTrip = completeTrip;
+
+        let pollingOffersInterval = null;
+        let geoInterval = null;
+
+        toggleStatusBtn.addEventListener('click', () => {
+            isActive = !isActive;
+            
+            if (isActive) {
+                toggleStatusBtn.classList.add('active');
+                statusDot.classList.add('active');
+                toggleStatusBtn.innerText = 'Desactivar servicio';
+                geoStatus.style.color = 'white';
+                geoStatus.innerText = 'Estado: En línea, buscando viajes...';
+
+                geoInterval = setInterval(() => simulateGeolocation((pos) => {
+                    if (!driverPreferences.shareLocation) return;
+                    fetch(`${API}/driver/location`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'session-id': sessionId
+                        },
+                        body: JSON.stringify(pos)
+                    });
+                }), 2000);
+
+                pollingOffersInterval = setInterval(fetchTripOffers, 5000); 
+                
+                simulateGeolocation((pos) => {
+                    if (!driverPreferences.shareLocation) return;
+                    fetch(`${API}/driver/location`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'session-id': sessionId
+                        },
+                        body: JSON.stringify(pos)
+                    });
+                });
+                fetchTripOffers();
+
+                gsap.to(statusDot, { scale: 1.5, repeat: -1, yoyo: true, duration: 0.8, ease: "power1.inOut" });
+
+            } else {
+                toggleStatusBtn.classList.remove('active');
+                statusDot.classList.remove('active');
+                toggleStatusBtn.innerText = 'Activar servicio';
+                geoStatus.style.color = '#ccc';
+                geoStatus.innerText = 'Estado: Fuera de línea';
+
+                clearInterval(geoInterval);
+                clearInterval(pollingOffersInterval);
+                if (currentChatInterval) clearInterval(currentChatInterval);
+                gsap.killTweensOf(statusDot);
+                gsap.to(statusDot, { scale: 1, duration: 0.3 });
+                if (passengerLocationPolling) {
+                    clearInterval(passengerLocationPolling);
+                    passengerLocationPolling = null;
+                }
+                passengerCurrentLocation = null;
+                updateNavigationAvailability();
+                completeTrip();
+            }
+        });
+        
+        // Lógica de chat mejorada
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+        const chatMessagesDiv = document.getElementById('chatMessages');
+
+        function startChatSession(tripId) {
+            console.log("🟡 Conductor iniciando sesión de chat para viaje:", tripId);
+            
+            document.querySelector('.chat-container').classList.add('active');
+            
+            const fetchMessages = async () => {
+                try {
+                    const [messagesRes, typingRes] = await Promise.all([
+                        fetch(`${API}/chat/${tripId}/messages`),
+                        fetch(`${API}/chat/${tripId}/typing`)
+                    ]);
+                    
+                    if (!messagesRes.ok) throw new Error('Error en respuesta del servidor');
+                    
+                    const messages = await messagesRes.json();
+                    const typingData = await typingRes.json();
+                    
+                    updateChatMessages(messages);
+                    updateTypingIndicator(typingData.typing);
+                    
+                } catch (error) {
+                    console.log("⚠️ Error al obtener mensajes:", error);
+                }
+            };
+
+            const updateChatMessages = (messages) => {
+                chatMessagesDiv.innerHTML = '';
+                messages.forEach(msg => {
+                    const msgElement = document.createElement('div');
+                    msgElement.classList.add('chat-message');
+                    msgElement.setAttribute('data-message-id', msg.messageId || msg.timestamp);
+                    
+                    const isOwnMessage = msg.sender === userName;
+                    const isSystemMessage = msg.type === "system";
+                    
+                    if (isSystemMessage) {
+                        msgElement.classList.add('system');
+                    } else {
+                        msgElement.classList.add(isOwnMessage ? 'self' : 'other');
+                    }
+                    
+                    msgElement.innerHTML = `
+                        ${!isSystemMessage ? `<div class="sender-name">${msg.sender}</div>` : ''}
+                        <div class="message-text">${msg.message}</div>
+                        <div class="message-time">${msg.displayTime || msg.timestamp}</div>
+                        ${isOwnMessage ? '<div class="message-status">✓</div>' : ''}
+                    `;
+                    
+                    chatMessagesDiv.appendChild(msgElement);
+                });
+                
+                chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+            };
+
+            const updateTypingIndicator = (typingUsers) => {
+                const existingIndicator = document.getElementById('typing-indicator');
+                if (existingIndicator) {
+                    existingIndicator.remove();
+                }
+                
+                if (typingUsers.length > 0) {
+                    const typingIndicator = document.createElement('div');
+                    typingIndicator.id = 'typing-indicator';
+                    typingIndicator.className = 'typing-indicator';
+                    typingIndicator.innerHTML = `
+                        <div class="typing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div class="typing-text">${typingUsers[0]} está escribiendo...</div>
+                    `;
+                    chatMessagesDiv.appendChild(typingIndicator);
+                    chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+                }
+            };
+
+            const sendMessage = async () => {
+                const message = chatInput.value.trim();
+                if (message === "") return;
+
+                // Indicar que dejó de escribir
+                await updateTypingStatus(false);
+
+                try {
+                    const res = await fetch(`${API}/chat/${tripId}/send`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            sender: userName, 
+                            message: message 
+                        })
+                    });
+                    
+                    const data = await res.json();
+                    
+                    if (data.success) {
+                        chatInput.value = '';
+                        // Actualizar mensajes inmediatamente después de enviar
+                        setTimeout(fetchMessages, 100);
+                    } else {
+                        showMessageError('Error al enviar mensaje');
+                    }
+                } catch (error) {
+                    console.error('❌ Error de conexión al enviar mensaje:', error);
+                    showMessageError('Error de conexión');
+                }
+            };
+
+            const updateTypingStatus = async (typing) => {
+                if (isTyping === typing) return;
+                
+                isTyping = typing;
+                
+                try {
+                    await fetch(`${API}/chat/${tripId}/typing`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            sender: userName, 
+                            isTyping: typing 
+                        })
+                    });
+                } catch (error) {
+                    // Silenciar errores de typing
+                }
+            };
+
+            const handleTyping = () => {
+                if (!isTyping) {
+                    updateTypingStatus(true);
+                }
+                
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    updateTypingStatus(false);
+                }, 1000);
+            };
+
+            const showMessageError = (message) => {
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'message-error';
+                errorMsg.textContent = message;
+                errorMsg.style.cssText = `
+                    background: #ff4444;
+                    color: white;
+                    padding: 8px 12px;
+                    border-radius: 10px;
+                    margin: 5px 0;
+                    text-align: center;
+                    font-size: 0.8em;
+                `;
+                chatMessagesDiv.appendChild(errorMsg);
+                setTimeout(() => errorMsg.remove(), 3000);
+            };
+
+            // Configurar eventos
+            sendChatBtn.onclick = sendMessage;
+            
+            chatInput.addEventListener('input', handleTyping);
+            
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    sendMessage();
+                }
+            });
+
+            // Agregar botones de mensajes rápidos
+            addQuickReplies(tripId);
+
+            // Cargar mensajes iniciales
+            fetchMessages();
+            
+            // Polling más eficiente
+            if (currentChatInterval) clearInterval(currentChatInterval);
+            currentChatInterval = setInterval(fetchMessages, 1500); // Actualizar cada 1.5 segundos
+        }
+
+        // Función para agregar mensajes rápidos
+        function addQuickReplies(tripId) {
+            const quickReplies = [
+                "Estoy en camino",
+                "Llegaré en 5 minutos",
+                "¿En qué punto exacto estás?",
+                "Ya llegué",
+                "Gracias por viajar con UniRiders"
+            ];
+            
+            const quickRepliesContainer = document.createElement('div');
+            quickRepliesContainer.className = 'quick-replies';
+            
+            quickReplies.forEach(reply => {
+                const button = document.createElement('button');
+                button.textContent = reply;
+                button.className = 'quick-reply-btn';
+                button.onclick = () => {
+                    chatInput.value = reply;
+                    sendChatBtn.click();
+                };
+                quickRepliesContainer.appendChild(button);
+            });
+            
+            chatMessagesDiv.parentNode.insertBefore(quickRepliesContainer, chatMessagesDiv);
+        }
+
+        // Función para mostrar notificaciones
+        function showToast(message, success) {
+            const toast = document.getElementById('toast');
+            if (toast) {
+                toast.textContent = message;
+                toast.style.background = success ? 
+                    "linear-gradient(135deg, #4CAF50, #45a049)" : 
+                    "linear-gradient(135deg, #ff4444, #cc0000)";
+                toast.classList.add("show");
+                
+                setTimeout(() => toast.classList.remove("show"), 4000);
+            }
+        }
+
+        // Función para reanudar viaje como conductor - NUEVA
+        async function resumeDriverTrip(tripId) {
+            try {
+                showToast('🔄 Reanudando viaje activo...', true);
+                
+                // Obtener detalles del viaje
+                const detailsRes = await fetch(`${API}/trips/${tripId}/details`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    }
+                });
+                
+                if (!detailsRes.ok) {
+                    throw new Error('Viaje no encontrado');
+                }
+                
+                const tripDetails = await detailsRes.json();
+                
+                if (tripDetails.estado !== 'ACEPTADO') {
+                    showToast('❌ El viaje ya no está activo', false);
+                    return;
+                }
+                
+                // Activar el servicio del conductor
+                if (!isActive) {
+                    isActive = true;
+                    toggleStatusBtn.classList.add('active');
+                    statusDot.classList.add('active');
+                    toggleStatusBtn.innerText = 'Desactivar servicio';
+                    
+                    // Iniciar geolocalización
+                    geoInterval = setInterval(() => simulateGeolocation((pos) => {
+                        fetch(`${API}/driver/location`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'user-email': userEmail,
+                                'session-id': sessionId
+                            },
+                            body: JSON.stringify(pos)
+                        });
+                    }), 2000);
+                }
+                
+                // Configurar el viaje activo
+                currentTrip = {
+                    id: tripDetails.id_viaje,
+                    passenger: tripDetails.nombre_pasajero,
+                    passengerEmail: tripDetails.pasajero_email,
+                    origin: tripDetails.origen,
+                    destination: tripDetails.destino,
+                    payment: tripDetails.metodo_pago,
+                    status: 'ACEPTADO'
+                };
+                
+                // Actualizar UI
+                offersPanel.style.display = 'none';
+                activeTripPanel.style.display = 'block';
+                mapElement.classList.add('active');
+                
+                document.getElementById('activeTripPassengerName').innerText = currentTrip.passenger;
+                document.getElementById('activeTripOrigin').innerText = currentTrip.origin;
+                document.getElementById('activeTripDestination').innerText = currentTrip.destination;
+                document.getElementById('activeTripPayment').innerText = currentTrip.payment;
+
+                // Configurar mapa y chat
+                if (tripDetails.coordenadas_pasajero_lat && tripDetails.coordenadas_pasajero_lon) {
+                    passengerCurrentLocation = {
+                        lat: parseFloat(tripDetails.coordenadas_pasajero_lat),
+                        lon: parseFloat(tripDetails.coordenadas_pasajero_lon)
+                    };
+                }
+                updateDriverMap();
+                updateNavigationAvailability();
+                startPassengerLocationPolling(currentTrip.id);
+                startChatSession(currentTrip.id);
+
+                showToast('✅ Viaje reanudado correctamente', true);
+                
+            } catch (error) {
+                console.error('Error reanudando viaje:', error);
+                showToast('❌ Error al reanudar el viaje', false);
+            }
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            loadDriverProfilePhoto();
+            setupVoiceRecognition();
+            showDriverStats();
+            loadDriverTripHistory();
+
+            // Verificar si hay un viaje para reanudar
+            const urlParams = new URLSearchParams(window.location.search);
+            const resumeTripId = urlParams.get('resumeTrip');
+
+            if (resumeTripId) {
+                resumeDriverTrip(resumeTripId);
+            }
+
+            // Mostrar estadísticas iniciales
+            setTimeout(showDriverStats, 1000);
+            updateNavigationAvailability();
+        });
+
+        document.getElementById('completeTripBtn').addEventListener('click', async () => {
+    const tripId = window.currentTripId;
+    if (!tripId) {
+        showToast('No hay viaje activo', false);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/trips/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tripId, driverEmail: userEmail })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            window.location.href = `trip-history.html?sessionId=${sessionId}`;
+        } else {
+            showToast(data.message || 'Error finalizando viaje', false);
+        }
+    } catch (err) {
+        console.error(err);
+        showToast('Error de conexión', false);
+    }
+});
+    </script>
+</body>
+</html>
