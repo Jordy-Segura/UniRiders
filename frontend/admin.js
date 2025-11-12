@@ -1,18 +1,15 @@
 const API = window.API || "http://localhost:3000/api";
 
-const MASTER_ADMIN_EMAIL = "marcelo2005jmsp@gamil.com";
-const MASTER_ADMIN_EMAIL_LOWER = MASTER_ADMIN_EMAIL.toLowerCase();
-
 function normalizeEmailValue(value) {
     return value ? value.trim().toLowerCase() : '';
 }
 
-function isMasterAdminEmail(email) {
-    return normalizeEmailValue(email) === MASTER_ADMIN_EMAIL_LOWER;
-}
-
 function isInstitutionalEmail(email) {
     return normalizeEmailValue(email).endsWith('@espoch.edu.ec');
+}
+
+function isGmailEmail(email) {
+    return normalizeEmailValue(email).endsWith('@gmail.com');
 }
 
 let adminMap;
@@ -288,6 +285,11 @@ async function saveUserRow(button) {
     const role = row.querySelector('[data-field="role"]').value;
     const whatsapp = row.querySelector('[data-field="whatsapp"]').value.trim();
 
+    if (role === 'administrador' && !isGmailEmail(email)) {
+        showToast('Los administradores deben usar correos Gmail', false);
+        return;
+    }
+
     try {
         const res = await fetch(`${API}/admin/users/${encodeURIComponent(email)}`, {
             method: 'PATCH',
@@ -433,29 +435,61 @@ async function createManualUser(event) {
     const whatsapp = document.getElementById('newUserPhone').value.trim();
     const paymentMethod = document.getElementById('newUserPayment').value;
 
-    if (!name || !normalizedEmail || !password) {
-        showToast('Nombre, correo y contraseña son obligatorios', false);
+    if (!name || !normalizedEmail) {
+        showToast('Nombre y correo son obligatorios', false);
         return;
     }
 
-    if (role !== 'administrador' && !isInstitutionalEmail(email)) {
-        showToast('Solo se permiten correos @espoch.edu.ec para roles no administrativos', false);
-        return;
+    if (role === 'administrador') {
+        if (!isGmailEmail(email)) {
+            showToast('Los administradores deben usar correos Gmail', false);
+            return;
+        }
+    } else {
+        if (!isInstitutionalEmail(email)) {
+            showToast('Solo se permiten correos @espoch.edu.ec para roles no administrativos', false);
+            return;
+        }
+
+        if (!password) {
+            showToast('La contraseña temporal es obligatoria para este rol', false);
+            return;
+        }
     }
 
     try {
+        const payload = { name, email: normalizedEmail, role, whatsapp, paymentMethod };
+        if (password) {
+            payload.password = password;
+        }
+
         const res = await fetch(`${API}/admin/users`, {
             method: 'POST',
             headers: baseHeaders(),
-            body: JSON.stringify({ name, email: normalizedEmail, password, role, whatsapp, paymentMethod })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'No se pudo crear el usuario');
         showToast(data.message || 'Usuario creado');
         event.target.reset();
+        document.getElementById('newUserRole').dispatchEvent(new Event('change'));
         loadUsers();
     } catch (error) {
         showToast(error.message || 'Error al crear usuario', false);
+    }
+}
+
+function updateManualUserPasswordRequirement() {
+    const roleSelect = document.getElementById('newUserRole');
+    const passwordInput = document.getElementById('newUserPassword');
+    if (!roleSelect || !passwordInput) return;
+
+    if (roleSelect.value === 'administrador') {
+        passwordInput.removeAttribute('required');
+        passwordInput.placeholder = 'Acceso por código (opcional)';
+    } else {
+        passwordInput.setAttribute('required', 'required');
+        passwordInput.placeholder = 'Contraseña temporal';
     }
 }
 
@@ -490,6 +524,7 @@ async function createTariff(event) {
 
 function attachEventListeners() {
     document.getElementById('createUserForm').addEventListener('submit', createManualUser);
+    document.getElementById('newUserRole').addEventListener('change', updateManualUserPasswordRequirement);
     document.getElementById('createTariffForm').addEventListener('submit', createTariff);
     document.getElementById('adminContactForm').addEventListener('submit', updateAdminContact);
     document.getElementById('logoutBtn').addEventListener('click', () => {
@@ -560,6 +595,7 @@ function bootstrapAdminPanel() {
 
     initializeMap();
     attachEventListeners();
+    updateManualUserPasswordRequirement();
     loadUsers();
     loadPricing();
     loadEmergencies();

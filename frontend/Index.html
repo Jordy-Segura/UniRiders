@@ -198,6 +198,10 @@
                     <i class="fas fa-info-circle"></i>
                     Verifica que estés en <strong>uniriders-espoch.com</strong>
                 </div>
+
+                <a href="#" id="adminAccessLink" class="forgot-link" style="display: block; text-align: center; margin-top: 15px;">
+                    🛡️ Acceso administrador con código
+                </a>
             </form>
 
             <form id="registerForm" class="auth-form">
@@ -311,7 +315,37 @@
                 </a>
             </form>
 
-        </div> 
+            <form id="adminAccessForm" class="auth-form">
+                <p>🛡️ Acceso de administradores</p>
+
+                <div class="input-container">
+                    <i class="fas fa-envelope icon"></i>
+                    <input type="email" id="adminAccessEmail" placeholder="correo@gmail.com" required>
+                    <div class="input-focus-effect"></div>
+                </div>
+
+                <button type="button" id="adminRequestCode" class="submit-btn">
+                    <i class="fas fa-paper-plane"></i> Enviar código de acceso
+                </button>
+
+                <hr style="margin: 20px 0; border-color: #f0f0f0;">
+
+                <div class="input-container">
+                    <i class="fas fa-key icon"></i>
+                    <input type="text" id="adminAccessCode" placeholder="Código de 6 dígitos" maxlength="6">
+                    <div class="input-focus-effect"></div>
+                </div>
+
+                <button type="button" id="adminVerifyCode" class="submit-btn" disabled>
+                    <i class="fas fa-unlock"></i> Verificar código
+                </button>
+
+                <a href="#" id="backToLoginFromAdmin" class="forgot-link" style="text-align: center; display: block; margin-top: 15px;">
+                    ← Volver al inicio
+                </a>
+            </form>
+
+        </div>
     </div>
 
     <div id="toast" class="toast"></div>

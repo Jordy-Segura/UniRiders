@@ -11,7 +11,7 @@ const { sql, poolPromise } = require("./db");
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { sendRecoveryMail, sendVerificationMail } = require('./mailer');
+const { sendRecoveryMail, sendVerificationMail, sendAdminLoginMail } = require('./mailer');
 
 const app = express();
 app.use(cors());
@@ -40,7 +40,7 @@ const appStatistics = {
     totalEarnings: 0
 };
 
-const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gamil.com';
+const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_LOWER = DEFAULT_ADMIN_EMAIL.toLowerCase();
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
 
@@ -49,6 +49,10 @@ const ADMIN_MANAGEABLE_ROLES = ['pasajero', 'conductor', 'administrador'];
 
 function normalizeEmail(email) {
     return email ? String(email).trim().toLowerCase() : '';
+}
+
+function isGmailEmail(email) {
+    return normalizeEmail(email).endsWith('@gmail.com');
 }
 
 function sanitizePhoneNumber(phone) {
@@ -115,7 +119,21 @@ async function ensureAdminInfrastructure() {
             .query(`SELECT TOP 1 nombre, email, rol, telefono_whatsapp FROM Usuarios WHERE LOWER(email) = @email`);
 
         if (adminCheck.recordset.length === 0) {
-            console.log(`No existe la cuenta del administrador maestro (${DEFAULT_ADMIN_EMAIL}). Regístrala manualmente para establecer la contraseña.`);
+            const tempPassword = crypto.randomBytes(12).toString('hex');
+            const hashedPassword = await bcrypt.hash(tempPassword, 10);
+            const normalizedPhone = sanitizePhoneNumber(DEFAULT_ADMIN_PHONE);
+
+            await pool.request()
+                .input('nombre', sql.NVarChar, 'Administrador Principal')
+                .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL_LOWER)
+                .input('password', sql.NVarChar, hashedPassword)
+                .input('telefono', sql.NVarChar, normalizedPhone || null)
+                .query(`
+                    INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp)
+                    VALUES (@nombre, @email, @password, 'administrador', 'Efectivo', @telefono)
+                `);
+
+            console.log(`Se creó automáticamente la cuenta del administrador maestro (${DEFAULT_ADMIN_EMAIL}). Usa el acceso con código para ingresar.`);
         } else {
             const currentAdmin = adminCheck.recordset[0];
             if (currentAdmin.rol !== 'administrador') {
@@ -305,10 +323,6 @@ function validateEspochEmail(req, res, next) {
     req.body.email = email;
     const normalizedEmail = email.toLowerCase();
 
-    if (normalizedEmail === DEFAULT_ADMIN_EMAIL_LOWER) {
-        return next();
-    }
-
     if (!normalizedEmail.endsWith('@espoch.edu.ec')) {
         return res.status(400).json({
             message: "Solo se permiten correos institucionales @espoch.edu.ec"
@@ -323,16 +337,14 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
 
     email = email ? email.trim() : '';
     const normalizedEmail = normalizeEmail(email);
-    const isMasterAdmin = normalizedEmail === DEFAULT_ADMIN_EMAIL_LOWER;
-
-    if (!name || !email || !password || !confirm || (!isMasterAdmin && !role)) {
+    if (!name || !email || !password || !confirm || !role) {
         return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
     if (password !== confirm) {
         return res.status(400).json({ message: "Las contraseñas no coinciden" });
     }
 
-    if (!isMasterAdmin && !PUBLIC_REGISTRATION_ROLES.includes(role)) {
+    if (!PUBLIC_REGISTRATION_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
     }
 
@@ -352,7 +364,7 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
         verificationCodes.set(normalizedEmail, {
             code: verificationCode,
             expires: Date.now() + 10 * 60 * 1000,
-            userData: { name, email: normalizedEmail, password, role: targetRole }
+            userData: { name, email: normalizedEmail, password, role }
         });
 
         const emailSent = await sendVerificationMail(email, verificationCode);
@@ -397,7 +409,13 @@ app.post("/api/verify-registration", async (req, res) => {
 
         const { name, password, role, phone } = verificationData.userData;
         const pool = await poolPromise;
-        const hashedPassword = await bcrypt.hash(password, 10);
+        let passwordToHash = password;
+
+        if (!passwordToHash) {
+            passwordToHash = crypto.randomBytes(12).toString('hex');
+        }
+
+        const hashedPassword = await bcrypt.hash(passwordToHash, 10);
 
         await pool.request()
             .input("nombre", sql.NVarChar, name)
@@ -458,6 +476,94 @@ app.post("/api/login", async (req, res) => {
             role: user.rol
         });
 
+    } catch (err) {
+        res.status(500).json({ message: "Error del servidor" });
+    }
+});
+
+app.post("/api/admin/request-code", async (req, res) => {
+    const { email } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail || !isGmailEmail(normalizedEmail)) {
+        return res.status(400).json({ message: "Solo se permiten correos Gmail para administradores" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const adminLookup = await pool.request()
+            .input("email", sql.NVarChar, normalizedEmail)
+            .query("SELECT nombre FROM Usuarios WHERE LOWER(email) = @email AND rol = 'administrador'");
+
+        if (adminLookup.recordset.length === 0) {
+            return res.status(404).json({ message: "No existe un administrador registrado con este correo" });
+        }
+
+        const verificationCode = generateVerificationCode();
+        verificationCodes.set(normalizedEmail, {
+            code: verificationCode,
+            expires: Date.now() + 10 * 60 * 1000,
+            type: 'admin-login',
+            userName: adminLookup.recordset[0].nombre || 'Administrador'
+        });
+
+        const emailSent = await sendAdminLoginMail(email, verificationCode);
+
+        if (!emailSent) {
+            verificationCodes.delete(normalizedEmail);
+            return res.status(500).json({ message: "No se pudo enviar el código. Intenta nuevamente." });
+        }
+
+        res.json({ message: "Código de acceso enviado al correo del administrador" });
+    } catch (err) {
+        verificationCodes.delete(normalizedEmail);
+        res.status(500).json({ message: "Error del servidor" });
+    }
+});
+
+app.post("/api/admin/verify-code", async (req, res) => {
+    const { email, code } = req.body;
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail || !code) {
+        return res.status(400).json({ message: "Correo y código son obligatorios" });
+    }
+
+    const verificationData = verificationCodes.get(normalizedEmail);
+
+    if (!verificationData || verificationData.type !== 'admin-login') {
+        return res.status(400).json({ message: "Código inválido o expirado" });
+    }
+
+    if (Date.now() > verificationData.expires) {
+        verificationCodes.delete(normalizedEmail);
+        return res.status(400).json({ message: "El código ha expirado" });
+    }
+
+    if (verificationData.code !== code) {
+        return res.status(400).json({ message: "Código incorrecto" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const adminLookup = await pool.request()
+            .input("email", sql.NVarChar, normalizedEmail)
+            .query("SELECT nombre, email FROM Usuarios WHERE LOWER(email) = @email AND rol = 'administrador'");
+
+        if (adminLookup.recordset.length === 0) {
+            verificationCodes.delete(normalizedEmail);
+            return res.status(404).json({ message: "No existe un administrador registrado con este correo" });
+        }
+
+        const adminRecord = adminLookup.recordset[0];
+        verificationCodes.delete(normalizedEmail);
+
+        res.json({
+            message: "Acceso concedido",
+            userEmail: adminRecord.email,
+            userName: adminRecord.nombre || 'Administrador',
+            role: 'administrador'
+        });
     } catch (err) {
         res.status(500).json({ message: "Error del servidor" });
     }
@@ -581,16 +687,26 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
     const { name, email, password, role = 'pasajero', whatsapp, paymentMethod = 'Efectivo' } = req.body;
     const normalizedEmail = normalizeEmail(email);
 
-    if (!name || !normalizedEmail || !password) {
-        return res.status(400).json({ message: "Nombre, correo y contraseña son obligatorios" });
-    }
-
-    if (role !== 'administrador' && !normalizedEmail.endsWith('@espoch.edu.ec')) {
-        return res.status(400).json({ message: "Solo se permiten correos @espoch.edu.ec" });
+    if (!name || !normalizedEmail) {
+        return res.status(400).json({ message: "Nombre y correo son obligatorios" });
     }
 
     if (!ADMIN_MANAGEABLE_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
+    }
+
+    if (role === 'administrador') {
+        if (!isGmailEmail(normalizedEmail)) {
+            return res.status(400).json({ message: "Los administradores deben registrarse con correos Gmail" });
+        }
+    } else {
+        if (!normalizedEmail.endsWith('@espoch.edu.ec')) {
+            return res.status(400).json({ message: "Solo se permiten correos @espoch.edu.ec" });
+        }
+
+        if (!password) {
+            return res.status(400).json({ message: "La contraseña es obligatoria para este rol" });
+        }
     }
 
     try {
@@ -632,6 +748,10 @@ app.patch("/api/admin/users/:email", requireAdmin, async (req, res) => {
 
     if (role && !ADMIN_MANAGEABLE_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
+    }
+
+    if (role === 'administrador' && !isGmailEmail(normalizedTargetEmail)) {
+        return res.status(400).json({ message: "Los administradores deben utilizar correos Gmail" });
     }
 
     if (normalizedTargetEmail === DEFAULT_ADMIN_EMAIL_LOWER && role && role !== 'administrador') {
@@ -1792,6 +1912,10 @@ app.post("/api/profile/update", async (req, res) => {
 
     if (desiredRole === 'administrador' && requesterRole !== 'administrador') {
         return res.status(403).json({ message: "No tienes permisos para cambiar a rol administrador" });
+    }
+
+    if (desiredRole === 'administrador' && !isGmailEmail(normalizedEmail)) {
+        return res.status(400).json({ message: "Los administradores deben utilizar correos Gmail" });
     }
 
     if (normalizedEmail === DEFAULT_ADMIN_EMAIL_LOWER) {
