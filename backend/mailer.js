@@ -1,5 +1,17 @@
 const nodemailer = require("nodemailer");
 
+const MASTER_ADMIN_EMAIL = 'marcelo2005jmsp@gamil.com';
+const MASTER_ADMIN_EMAIL_LOWER = MASTER_ADMIN_EMAIL.toLowerCase();
+
+function normalizeEmailValue(value) {
+    return value ? String(value).trim().toLowerCase() : '';
+}
+
+function isAllowedRecipient(email) {
+    const normalized = normalizeEmailValue(email);
+    return normalized.endsWith('@espoch.edu.ec') || normalized === MASTER_ADMIN_EMAIL_LOWER;
+}
+
 // Configuración para Outlook/Office 365 (ESPOCH)
 const transporter = nodemailer.createTransport({
     host: "smtp.office365.com",
@@ -34,8 +46,8 @@ transporter.verify(function (error, success) {
 async function sendRecoveryMail(to, code) {
     try {
         // Verificar que sea correo ESPOCH
-        if (!to.endsWith('@espoch.edu.ec')) {
-            console.log('❌ Correo no ESPOCH:', to);
+        if (!isAllowedRecipient(to)) {
+            console.log('❌ Correo no autorizado para notificaciones:', to);
             return false;
         }
 
@@ -84,8 +96,8 @@ async function sendRecoveryMail(to, code) {
         <div class="content">
             <h2 style="color: #323130; text-align: center; margin-bottom: 15px;">Verificación de Cuenta</h2>
             <p style="color: #605e5c; text-align: center; font-size: 16px; line-height: 1.5;">
-                Hola estudiante ESPOCH,<br>
-                Para completar tu registro en UniRiders, utiliza el siguiente código:
+                Hola integrante de UniRiders,<br>
+                Para completar tu registro en la plataforma, utiliza el siguiente código:
             </p>
             
             <div class="code-box">
