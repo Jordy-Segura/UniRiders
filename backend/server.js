@@ -45,6 +45,9 @@ const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Administrador Gene
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
 const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '';
 
+const PUBLIC_REGISTRATION_ROLES = ['pasajero', 'conductor'];
+const ADMIN_MANAGEABLE_ROLES = ['pasajero', 'conductor', 'administrador'];
+
 function sanitizePhoneNumber(phone) {
     if (!phone) return null;
     const digits = String(phone).replace(/\D/g, "");
@@ -324,7 +327,7 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
         return res.status(400).json({ message: "Las contraseñas no coinciden" });
     }
 
-    if (!allowedRoles.includes(role)) {
+    if (!PUBLIC_REGISTRATION_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
     }
 
@@ -577,8 +580,7 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
         return res.status(400).json({ message: "Solo se permiten correos @espoch.edu.ec" });
     }
 
-    const allowedRoles = ['pasajero', 'conductor', 'administrador'];
-    if (!allowedRoles.includes(role)) {
+    if (!ADMIN_MANAGEABLE_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
     }
 
@@ -618,9 +620,7 @@ app.patch("/api/admin/users/:email", requireAdmin, async (req, res) => {
     const targetEmail = req.params.email;
     const { name, role, whatsapp, paymentMethod } = req.body;
 
-    const allowedRoles = ['pasajero', 'conductor', 'administrador'];
-
-    if (role && !allowedRoles.includes(role)) {
+    if (role && !ADMIN_MANAGEABLE_ROLES.includes(role)) {
         return res.status(400).json({ message: "Rol no permitido" });
     }
 
