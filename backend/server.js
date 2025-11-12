@@ -311,7 +311,9 @@ function validateEspochEmail(req, res, next) {
 }
 
 app.post("/api/register", validateEspochEmail, async (req, res) => {
-    const { name, email, password, confirm, role } = req.body;
+    const { name, email, password, confirm, role, phone } = req.body;
+
+    const allowedRoles = ['pasajero', 'conductor', 'administrador'];
 
     const allowedRoles = ['pasajero', 'conductor'];
 
@@ -338,10 +340,12 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
         }
 
         const verificationCode = generateVerificationCode();
+        const normalizedPhone = sanitizePhoneNumber(phone);
+
         verificationCodes.set(email, {
             code: verificationCode,
             expires: Date.now() + 10 * 60 * 1000,
-            userData: { name, email, password, role }
+            userData: { name, email, password, role, phone: normalizedPhone }
         });
 
         const emailSent = await sendVerificationMail(email, verificationCode);
@@ -383,7 +387,7 @@ app.post("/api/verify-registration", async (req, res) => {
             return res.status(400).json({ message: "Código incorrecto" });
         }
 
-        const { name, password, role } = verificationData.userData;
+        const { name, password, role, phone } = verificationData.userData;
         const pool = await poolPromise;
         const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -392,7 +396,8 @@ app.post("/api/verify-registration", async (req, res) => {
             .input("email", sql.NVarChar, email)
             .input("password", sql.NVarChar, hashedPassword)
             .input("rol", sql.NVarChar, role)
-            .query(`INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref) VALUES (@nombre, @email, @password, @rol, 'Efectivo')`);
+            .input("telefono", sql.NVarChar, phone || null)
+            .query(`INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp) VALUES (@nombre, @email, @password, @rol, 'Efectivo', @telefono)`);
 
         // Actualizar estadísticas
         appStatistics.totalUsers++;
