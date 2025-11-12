@@ -1,5 +1,20 @@
 const API = window.API || "http://localhost:3000/api";
 
+const MASTER_ADMIN_EMAIL = "marcelo2005jmsp@gamil.com";
+const MASTER_ADMIN_EMAIL_LOWER = MASTER_ADMIN_EMAIL.toLowerCase();
+
+function normalizeEmailValue(value) {
+    return value ? value.trim().toLowerCase() : '';
+}
+
+function isMasterAdminEmail(email) {
+    return normalizeEmailValue(email) === MASTER_ADMIN_EMAIL_LOWER;
+}
+
+function isInstitutionalEmail(email) {
+    return normalizeEmailValue(email).endsWith('@espoch.edu.ec');
+}
+
 let adminMap;
 const driverMarkers = new Map();
 let adminEmail = '';
@@ -412,16 +427,27 @@ async function createManualUser(event) {
     event.preventDefault();
     const name = document.getElementById('newUserName').value.trim();
     const email = document.getElementById('newUserEmail').value.trim();
+    const normalizedEmail = normalizeEmailValue(email);
     const password = document.getElementById('newUserPassword').value.trim();
     const role = document.getElementById('newUserRole').value;
     const whatsapp = document.getElementById('newUserPhone').value.trim();
     const paymentMethod = document.getElementById('newUserPayment').value;
 
+    if (!name || !normalizedEmail || !password) {
+        showToast('Nombre, correo y contraseña son obligatorios', false);
+        return;
+    }
+
+    if (role !== 'administrador' && !isInstitutionalEmail(email)) {
+        showToast('Solo se permiten correos @espoch.edu.ec para roles no administrativos', false);
+        return;
+    }
+
     try {
         const res = await fetch(`${API}/admin/users`, {
             method: 'POST',
             headers: baseHeaders(),
-            body: JSON.stringify({ name, email, password, role, whatsapp, paymentMethod })
+            body: JSON.stringify({ name, email: normalizedEmail, password, role, whatsapp, paymentMethod })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'No se pudo crear el usuario');

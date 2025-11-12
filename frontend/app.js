@@ -1,6 +1,21 @@
 const API = "http://localhost:3000/api";
 window.API = API;
 
+const MASTER_ADMIN_EMAIL = "marcelo2005jmsp@gamil.com";
+const MASTER_ADMIN_EMAIL_LOWER = MASTER_ADMIN_EMAIL.toLowerCase();
+
+function normalizeEmailValue(value) {
+  return value ? value.trim().toLowerCase() : "";
+}
+
+function isMasterAdminEmail(email) {
+  return normalizeEmailValue(email) === MASTER_ADMIN_EMAIL_LOWER;
+}
+
+function isInstitutionalEmail(email) {
+  return normalizeEmailValue(email).endsWith('@espoch.edu.ec');
+}
+
 const loginBtn = document.getElementById("loginBtn");
 const registerBtn = document.getElementById("registerBtn");
 const forgotLink = document.getElementById("forgotLink");
@@ -96,6 +111,7 @@ registerForm.addEventListener("submit", async e => {
   e.preventDefault();
   const name = document.getElementById("regName").value.trim();
   const email = document.getElementById("regEmail").value.trim();
+  const normalizedEmail = normalizeEmailValue(email);
   const password = document.getElementById("regPassword").value.trim();
   const confirm = document.getElementById("regConfirm").value.trim();
   const role = document.querySelector('input[name="role"]:checked').value;
@@ -106,21 +122,16 @@ registerForm.addEventListener("submit", async e => {
     return;
   }
 
-  if (role === 'administrador' && phone.length < 6) {
-    showToast("Ingresa un número de contacto válido", false);
-    return;
-  }
-
-  // Validar correo ESPOCH
-  if (!email.endsWith('@espoch.edu.ec')) {
-    showToast("Solo se permiten correos institucionales @espoch.edu.ec", false);
+  // Validar correo permitido (ESPOCH o administrador autorizado)
+  if (!isInstitutionalEmail(email) && !isMasterAdminEmail(email)) {
+    showToast("Solo se permiten correos institucionales @espoch.edu.ec (excepto el administrador autorizado)", false);
     return;
   }
 
   try {
     const submitBtn = registerForm.querySelector('button[type="submit"]');
     setButtonLoading(submitBtn, true, "Creando cuenta...");
-    const payload = { name, email, password, confirm, role };
+    const payload = { name, email: normalizedEmail, password, confirm, role };
     const res = await fetch(`${API}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -130,7 +141,7 @@ registerForm.addEventListener("submit", async e => {
 
     if (res.ok && data.requiresVerification) {
       // Mostrar formulario de verificación
-      showVerificationForm(email, name, password, role);
+      showVerificationForm(normalizedEmail, name, password, role);
       showToast(data.message, true);
     } else {
       showToast(data.message, res.ok);
@@ -154,7 +165,7 @@ function showVerificationForm(email, name, password, role) {
     verificationForm.id = "verificationForm";
     verificationForm.className = "auth-form";
     verificationForm.innerHTML = `
-      <p>📧 Verifica tu correo ESPOCH</p>
+      <p>📧 Verifica tu correo electrónico</p>
       
       <div class="input-container">
         <i class="fas fa-envelope icon"></i>
@@ -246,6 +257,7 @@ loginForm.addEventListener("submit", async e => {
   e.preventDefault();
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value.trim();
+  const normalizedEmail = normalizeEmailValue(email);
 
   try {
     const submitBtn = loginForm.querySelector('button[type="submit"]');
@@ -253,7 +265,7 @@ loginForm.addEventListener("submit", async e => {
     const res = await fetch(`${API}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: normalizedEmail, password })
     });
     const data = await res.json();
 
@@ -261,7 +273,7 @@ loginForm.addEventListener("submit", async e => {
 
     if (res.ok) {
         if (document.getElementById("rememberMe")?.checked) {
-            localStorage.setItem('rememberedEmail', email);
+            localStorage.setItem('rememberedEmail', normalizedEmail);
         } else {
             localStorage.removeItem('rememberedEmail');
         }
@@ -296,10 +308,11 @@ loginForm.addEventListener("submit", async e => {
 sendCodeBtn.addEventListener("click", async () => {
   const email = document.getElementById("recEmail").value.trim();
   if (!email) return showToast('Ingrese un correo electrónico', false);
-  
-  // Validar correo ESPOCH
-  if (!email.endsWith('@espoch.edu.ec')) {
-    showToast("Solo se permiten correos institucionales @espoch.edu.ec", false);
+  const normalizedEmail = normalizeEmailValue(email);
+
+  // Validar correo permitido (ESPOCH o administrador autorizado)
+  if (!isInstitutionalEmail(email) && !isMasterAdminEmail(email)) {
+    showToast("Solo se permiten correos institucionales @espoch.edu.ec (excepto el administrador autorizado)", false);
     return;
   }
 
@@ -308,7 +321,7 @@ sendCodeBtn.addEventListener("click", async () => {
     const res = await fetch(`${API}/recover`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email: normalizedEmail })
     });
     const data = await res.json();
     showToast(data.message, res.ok);
@@ -326,13 +339,14 @@ resetPassBtn.addEventListener("click", async () => {
   const newPassword = document.getElementById("recNewPass").value.trim();
 
   if (!email || !code || !newPassword) return showToast('Complete todos los campos', false);
+  const normalizedEmail = normalizeEmailValue(email);
 
   try {
     setButtonLoading(resetPassBtn, true, "Actualizando...");
     const res = await fetch(`${API}/reset`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code, newPassword })
+      body: JSON.stringify({ email: normalizedEmail, code, newPassword })
     });
     const data = await res.json();
     showToast(data.message, res.ok);
@@ -348,12 +362,12 @@ resetPassBtn.addEventListener("click", async () => {
   }
 });
 
-// Validación en tiempo real para correo ESPOCH en registro
+// Validación en tiempo real para correo permitido en registro
 document.getElementById('regEmail').addEventListener('blur', function() {
   const email = this.value.trim();
-  if (email && !email.endsWith('@espoch.edu.ec')) {
+  if (email && !isInstitutionalEmail(email) && !isMasterAdminEmail(email)) {
     this.style.borderColor = 'red';
-    showToast('Solo se permiten correos @espoch.edu.ec', false);
+    showToast('Solo se permiten correos @espoch.edu.ec (excepto el administrador autorizado)', false);
   } else {
     this.style.borderColor = '';
   }
