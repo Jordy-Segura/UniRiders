@@ -6,6 +6,7 @@ const verificationCodes = new Map();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { sql, poolPromise } = require("./db");
 const multer = require('multer');
 const path = require('path');
@@ -38,6 +39,11 @@ const appStatistics = {
     activeUsers: 0,
     totalEarnings: 0
 };
+
+const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gamil.com';
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Administrador General';
+const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '';
 
 function sanitizePhoneNumber(phone) {
     if (!phone) return null;
@@ -97,6 +103,48 @@ async function ensureAdminInfrastructure() {
                 );
             END
         `);
+
+        const adminCheck = await pool.request()
+            .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+            .query(`SELECT TOP 1 nombre, email, rol, telefono_whatsapp FROM Usuarios WHERE email = @email`);
+
+        if (adminCheck.recordset.length === 0) {
+            const tempPassword = DEFAULT_ADMIN_PASSWORD || `Admin-${crypto.randomBytes(4).toString('hex')}`;
+            const hashedPassword = await bcrypt.hash(tempPassword, 10);
+            const normalizedPhone = sanitizePhoneNumber(DEFAULT_ADMIN_PHONE);
+
+            await pool.request()
+                .input('nombre', sql.NVarChar, DEFAULT_ADMIN_NAME)
+                .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                .input('password', sql.NVarChar, hashedPassword)
+                .input('telefono', sql.NVarChar, normalizedPhone || null)
+                .query(`
+                    INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp)
+                    VALUES (@nombre, @email, @password, 'administrador', 'Efectivo', @telefono)
+                `);
+
+            console.log(`Administrador maestro creado: ${DEFAULT_ADMIN_EMAIL}`);
+            if (!DEFAULT_ADMIN_PASSWORD) {
+                console.log(`Contraseña temporal generada para ${DEFAULT_ADMIN_EMAIL}: ${tempPassword}`);
+            }
+        } else {
+            const currentAdmin = adminCheck.recordset[0];
+            if (currentAdmin.rol !== 'administrador') {
+                await pool.request()
+                    .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                    .query(`UPDATE Usuarios SET rol = 'administrador' WHERE email = @email`);
+            }
+
+            if (DEFAULT_ADMIN_PHONE) {
+                const normalizedPhone = sanitizePhoneNumber(DEFAULT_ADMIN_PHONE);
+                if (normalizedPhone && normalizedPhone !== currentAdmin.telefono_whatsapp) {
+                    await pool.request()
+                        .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                        .input('telefono', sql.NVarChar, normalizedPhone)
+                        .query(`UPDATE Usuarios SET telefono_whatsapp = @telefono WHERE email = @email`);
+                }
+            }
+        }
 
     } catch (infraErr) {
         console.log('Error asegurando infraestructura de administrador:', infraErr);
@@ -267,6 +315,8 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
 
     const allowedRoles = ['pasajero', 'conductor', 'administrador'];
 
+    const allowedRoles = ['pasajero', 'conductor'];
+
     if (!name || !email || !password || !confirm || !role) {
         return res.status(400).json({ message: "Todos los campos son obligatorios" });
     }
@@ -278,13 +328,9 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
         return res.status(400).json({ message: "Rol no permitido" });
     }
 
-    if (role === 'administrador' && (!phone || !sanitizePhoneNumber(phone))) {
-        return res.status(400).json({ message: "El número de contacto es obligatorio para administradores" });
-    }
-
     try {
         const pool = await poolPromise;
-        
+
         const userCheck = await pool.request()
             .input("email", sql.NVarChar, email)
             .query("SELECT email FROM Usuarios WHERE email = @email");
@@ -527,7 +573,7 @@ app.post("/api/admin/users", requireAdmin, async (req, res) => {
         return res.status(400).json({ message: "Nombre, correo y contraseña son obligatorios" });
     }
 
-    if (!email.endsWith('@espoch.edu.ec')) {
+    if (role !== 'administrador' && !email.endsWith('@espoch.edu.ec')) {
         return res.status(400).json({ message: "Solo se permiten correos @espoch.edu.ec" });
     }
 
