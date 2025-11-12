@@ -6,6 +6,7 @@ const verificationCodes = new Map();
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const { sql, poolPromise } = require("./db");
 const multer = require('multer');
 const path = require('path');
@@ -38,6 +39,120 @@ const appStatistics = {
     activeUsers: 0,
     totalEarnings: 0
 };
+
+const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gamil.com';
+const DEFAULT_ADMIN_NAME = process.env.DEFAULT_ADMIN_NAME || 'Administrador General';
+const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
+const DEFAULT_ADMIN_PASSWORD = process.env.DEFAULT_ADMIN_PASSWORD || '';
+
+const PUBLIC_REGISTRATION_ROLES = ['pasajero', 'conductor'];
+const ADMIN_MANAGEABLE_ROLES = ['pasajero', 'conductor', 'administrador'];
+
+function sanitizePhoneNumber(phone) {
+    if (!phone) return null;
+    const digits = String(phone).replace(/\D/g, "");
+    return digits.length ? digits : null;
+}
+
+function requireAdmin(req, res, next) {
+    const role = req.headers['user-role'];
+
+    if (role !== 'administrador') {
+        return res.status(403).json({ message: "Solo los administradores pueden acceder a esta función" });
+    }
+
+    next();
+}
+
+async function ensureAdminInfrastructure() {
+    try {
+        const pool = await poolPromise;
+
+        await pool.request().query(`
+            IF COL_LENGTH('Usuarios', 'telefono_whatsapp') IS NULL
+            BEGIN
+                ALTER TABLE Usuarios ADD telefono_whatsapp NVARCHAR(30) NULL;
+            END
+        `);
+
+        await pool.request().query(`
+            IF OBJECT_ID('dbo.Tarifas', 'U') IS NULL
+            BEGIN
+                CREATE TABLE Tarifas (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    nombre NVARCHAR(120) NOT NULL,
+                    descripcion NVARCHAR(255) NULL,
+                    precio DECIMAL(10,2) NOT NULL,
+                    activo BIT NOT NULL DEFAULT 1,
+                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE(),
+                    creado_por NVARCHAR(150) NULL
+                );
+            END
+        `);
+
+        await pool.request().query(`
+            IF OBJECT_ID('dbo.AlertasEmergencia', 'U') IS NULL
+            BEGIN
+                CREATE TABLE AlertasEmergencia (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    usuario_email NVARCHAR(150) NOT NULL,
+                    mensaje NVARCHAR(500) NULL,
+                    ubicacion_lat DECIMAL(10,6) NULL,
+                    ubicacion_lon DECIMAL(10,6) NULL,
+                    trip_id INT NULL,
+                    atendido BIT NOT NULL DEFAULT 0,
+                    fecha DATETIME NOT NULL DEFAULT GETDATE(),
+                    atendido_por NVARCHAR(150) NULL
+                );
+            END
+        `);
+
+        const adminCheck = await pool.request()
+            .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+            .query(`SELECT TOP 1 nombre, email, rol, telefono_whatsapp FROM Usuarios WHERE email = @email`);
+
+        if (adminCheck.recordset.length === 0) {
+            const tempPassword = DEFAULT_ADMIN_PASSWORD || `Admin-${crypto.randomBytes(4).toString('hex')}`;
+            const hashedPassword = await bcrypt.hash(tempPassword, 10);
+            const normalizedPhone = sanitizePhoneNumber(DEFAULT_ADMIN_PHONE);
+
+            await pool.request()
+                .input('nombre', sql.NVarChar, DEFAULT_ADMIN_NAME)
+                .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                .input('password', sql.NVarChar, hashedPassword)
+                .input('telefono', sql.NVarChar, normalizedPhone || null)
+                .query(`
+                    INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp)
+                    VALUES (@nombre, @email, @password, 'administrador', 'Efectivo', @telefono)
+                `);
+
+            console.log(`Administrador maestro creado: ${DEFAULT_ADMIN_EMAIL}`);
+            if (!DEFAULT_ADMIN_PASSWORD) {
+                console.log(`Contraseña temporal generada para ${DEFAULT_ADMIN_EMAIL}: ${tempPassword}`);
+            }
+        } else {
+            const currentAdmin = adminCheck.recordset[0];
+            if (currentAdmin.rol !== 'administrador') {
+                await pool.request()
+                    .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                    .query(`UPDATE Usuarios SET rol = 'administrador' WHERE email = @email`);
+            }
+
+            if (DEFAULT_ADMIN_PHONE) {
+                const normalizedPhone = sanitizePhoneNumber(DEFAULT_ADMIN_PHONE);
+                if (normalizedPhone && normalizedPhone !== currentAdmin.telefono_whatsapp) {
+                    await pool.request()
+                        .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL)
+                        .input('telefono', sql.NVarChar, normalizedPhone)
+                        .query(`UPDATE Usuarios SET telefono_whatsapp = @telefono WHERE email = @email`);
+                }
+            }
+        }
+
+    } catch (infraErr) {
+        console.log('Error asegurando infraestructura de administrador:', infraErr);
+    }
+}
 
 // =========================================================
 // FUNCIONES AUXILIARES MEJORADAS
@@ -208,9 +323,13 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
         return res.status(400).json({ message: "Las contraseñas no coinciden" });
     }
 
+    if (!PUBLIC_REGISTRATION_ROLES.includes(role)) {
+        return res.status(400).json({ message: "Rol no permitido" });
+    }
+
     try {
         const pool = await poolPromise;
-        
+
         const userCheck = await pool.request()
             .input("email", sql.NVarChar, email)
             .query("SELECT email FROM Usuarios WHERE email = @email");
@@ -416,6 +535,355 @@ app.post("/api/reset", async (req, res) => {
 
     } catch (err) {
         res.status(500).json({ message: "Error del servidor" });
+    }
+});
+
+// =========================================================
+// ADMINISTRACIÓN
+// =========================================================
+
+app.get("/api/admin/users", requireAdmin, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .query(`SELECT nombre, email, rol, metodo_pago_pref, telefono_whatsapp FROM Usuarios ORDER BY nombre`);
+
+        const users = result.recordset.map(user => ({
+            name: user.nombre,
+            email: user.email,
+            role: user.rol,
+            paymentMethod: user.metodo_pago_pref,
+            whatsapp: user.telefono_whatsapp
+        }));
+
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ message: "Error al obtener usuarios" });
+    }
+});
+
+app.post("/api/admin/users", requireAdmin, async (req, res) => {
+    const { name, email, password, role = 'pasajero', whatsapp, paymentMethod = 'Efectivo' } = req.body;
+
+    if (!name || !email || !password) {
+        return res.status(400).json({ message: "Nombre, correo y contraseña son obligatorios" });
+    }
+
+    if (role !== 'administrador' && !email.endsWith('@espoch.edu.ec')) {
+        return res.status(400).json({ message: "Solo se permiten correos @espoch.edu.ec" });
+    }
+
+    if (!ADMIN_MANAGEABLE_ROLES.includes(role)) {
+        return res.status(400).json({ message: "Rol no permitido" });
+    }
+
+    try {
+        const pool = await poolPromise;
+
+        const existing = await pool.request()
+            .input("email", sql.NVarChar, email)
+            .query("SELECT email FROM Usuarios WHERE email = @email");
+
+        if (existing.recordset.length > 0) {
+            return res.status(409).json({ message: "El usuario ya existe" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const normalizedPhone = sanitizePhoneNumber(whatsapp);
+
+        await pool.request()
+            .input("nombre", sql.NVarChar, name)
+            .input("email", sql.NVarChar, email)
+            .input("password", sql.NVarChar, hashedPassword)
+            .input("rol", sql.NVarChar, role)
+            .input("metodo", sql.NVarChar, paymentMethod)
+            .input("telefono", sql.NVarChar, normalizedPhone || null)
+            .query(`
+                INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp)
+                VALUES (@nombre, @email, @password, @rol, @metodo, @telefono)
+            `);
+
+        res.status(201).json({ message: "Usuario creado correctamente" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al crear usuario" });
+    }
+});
+
+app.patch("/api/admin/users/:email", requireAdmin, async (req, res) => {
+    const targetEmail = req.params.email;
+    const { name, role, whatsapp, paymentMethod } = req.body;
+
+    if (role && !ADMIN_MANAGEABLE_ROLES.includes(role)) {
+        return res.status(400).json({ message: "Rol no permitido" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const updates = [];
+        const request = pool.request().input("email", sql.NVarChar, targetEmail);
+
+        if (name !== undefined) {
+            updates.push("nombre = @nombre");
+            request.input("nombre", sql.NVarChar, name);
+        }
+
+        if (role !== undefined) {
+            updates.push("rol = @rol");
+            request.input("rol", sql.NVarChar, role);
+        }
+
+        if (paymentMethod !== undefined) {
+            updates.push("metodo_pago_pref = @metodo");
+            request.input("metodo", sql.NVarChar, paymentMethod);
+        }
+
+        if (whatsapp !== undefined) {
+            updates.push("telefono_whatsapp = @telefono");
+            request.input("telefono", sql.NVarChar, sanitizePhoneNumber(whatsapp));
+        }
+
+        if (!updates.length) {
+            return res.status(400).json({ message: "No hay cambios para aplicar" });
+        }
+
+        const updateQuery = `UPDATE Usuarios SET ${updates.join(', ')} WHERE email = @email`;
+        const result = await request.query(updateQuery);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        res.json({ message: "Usuario actualizado" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al actualizar usuario" });
+    }
+});
+
+app.delete("/api/admin/users/:email", requireAdmin, async (req, res) => {
+    const targetEmail = req.params.email;
+    const adminEmail = req.headers['user-email'];
+
+    if (targetEmail === adminEmail) {
+        return res.status(400).json({ message: "No puedes eliminar tu propia cuenta" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input("email", sql.NVarChar, targetEmail)
+            .query("DELETE FROM Usuarios WHERE email = @email");
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        res.json({ message: "Usuario eliminado" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar usuario" });
+    }
+});
+
+app.get("/api/admin/pricing", requireAdmin, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT id, nombre, descripcion, precio, activo, fecha_creacion
+            FROM Tarifas
+            ORDER BY activo DESC, nombre ASC
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ message: "Error al obtener tarifas" });
+    }
+});
+
+app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
+    const { nombre, descripcion, precio, activo = true } = req.body;
+    const adminEmail = req.headers['user-email'];
+
+    if (!nombre || precio === undefined) {
+        return res.status(400).json({ message: "Nombre y precio son obligatorios" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input("nombre", sql.NVarChar, nombre)
+            .input("descripcion", sql.NVarChar, descripcion || null)
+            .input("precio", sql.Decimal(10,2), parseFloat(precio))
+            .input("activo", sql.Bit, activo ? 1 : 0)
+            .input("creado_por", sql.NVarChar, adminEmail || null)
+            .query(`
+                INSERT INTO Tarifas (nombre, descripcion, precio, activo, creado_por)
+                VALUES (@nombre, @descripcion, @precio, @activo, @creado_por)
+            `);
+
+        res.status(201).json({ message: "Tarifa creada" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al crear tarifa" });
+    }
+});
+
+app.put("/api/admin/pricing/:id", requireAdmin, async (req, res) => {
+    const tariffId = parseInt(req.params.id);
+    const { nombre, descripcion, precio, activo } = req.body;
+
+    if (Number.isNaN(tariffId)) {
+        return res.status(400).json({ message: "Tarifa inválida" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const updates = [];
+        const request = pool.request().input("id", sql.Int, tariffId);
+
+        if (nombre !== undefined) {
+            updates.push("nombre = @nombre");
+            request.input("nombre", sql.NVarChar, nombre);
+        }
+
+        if (descripcion !== undefined) {
+            updates.push("descripcion = @descripcion");
+            request.input("descripcion", sql.NVarChar, descripcion || null);
+        }
+
+        if (precio !== undefined) {
+            updates.push("precio = @precio");
+            request.input("precio", sql.Decimal(10,2), parseFloat(precio));
+        }
+
+        if (activo !== undefined) {
+            updates.push("activo = @activo");
+            request.input("activo", sql.Bit, activo ? 1 : 0);
+        }
+
+        if (!updates.length) {
+            return res.status(400).json({ message: "No hay cambios para aplicar" });
+        }
+
+        const result = await request.query(`UPDATE Tarifas SET ${updates.join(', ')} WHERE id = @id`);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: "Tarifa no encontrada" });
+        }
+
+        res.json({ message: "Tarifa actualizada" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al actualizar tarifa" });
+    }
+});
+
+app.delete("/api/admin/pricing/:id", requireAdmin, async (req, res) => {
+    const tariffId = parseInt(req.params.id);
+
+    if (Number.isNaN(tariffId)) {
+        return res.status(400).json({ message: "Tarifa inválida" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input("id", sql.Int, tariffId)
+            .query("DELETE FROM Tarifas WHERE id = @id");
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: "Tarifa no encontrada" });
+        }
+
+        res.json({ message: "Tarifa eliminada" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar tarifa" });
+    }
+});
+
+app.get("/api/admin/emergencies", requireAdmin, async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT id, usuario_email, mensaje, ubicacion_lat, ubicacion_lon, atendido, fecha, atendido_por, trip_id
+            FROM AlertasEmergencia
+            ORDER BY fecha DESC
+        `);
+
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ message: "Error al obtener emergencias" });
+    }
+});
+
+app.post("/api/admin/emergencies/:id/resolve", requireAdmin, async (req, res) => {
+    const emergencyId = parseInt(req.params.id);
+    const adminEmail = req.headers['user-email'];
+
+    if (Number.isNaN(emergencyId)) {
+        return res.status(400).json({ message: "Emergencia inválida" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request()
+            .input("id", sql.Int, emergencyId)
+            .input("adminEmail", sql.NVarChar, adminEmail || null)
+            .query(`
+                UPDATE AlertasEmergencia
+                SET atendido = 1, atendido_por = @adminEmail
+                WHERE id = @id
+            `);
+
+        if (result.rowsAffected[0] === 0) {
+            return res.status(404).json({ message: "Emergencia no encontrada" });
+        }
+
+        res.json({ message: "Emergencia marcada como atendida" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al actualizar emergencia" });
+    }
+});
+
+app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
+    try {
+        const driverEmails = Array.from(driverLocations.keys());
+        const response = [];
+
+        let namesMap = new Map();
+
+        if (driverEmails.length > 0) {
+            const pool = await poolPromise;
+            const request = pool.request();
+            const placeholders = driverEmails.map((_, idx) => `@email${idx}`).join(', ');
+            driverEmails.forEach((email, idx) => {
+                request.input(`email${idx}`, sql.NVarChar, email);
+            });
+
+            const result = await request.query(`SELECT email, nombre FROM Usuarios WHERE email IN (${placeholders})`);
+            result.recordset.forEach(row => namesMap.set(row.email, row.nombre));
+        }
+
+        driverEmails.forEach(email => {
+            const location = driverLocations.get(email);
+            const isBusy = Object.values(globalActiveTrips).some(trip => {
+                if (!trip) return false;
+                const driverEmail = trip.driverEmail || trip.conductor_email || trip.driver;
+                const status = trip.status || trip.estado;
+                if (!driverEmail) return false;
+                if (driverEmail !== email) return false;
+                return status && status !== 'FINALIZADO';
+            });
+
+            response.push({
+                email,
+                name: namesMap.get(email) || email,
+                lat: location.lat,
+                lon: location.lon,
+                available: !isBusy,
+                lastUpdate: location.timestamp
+            });
+        });
+
+        res.json(response);
+    } catch (err) {
+        res.status(500).json({ message: "Error al obtener ubicaciones" });
     }
 });
 
@@ -1225,8 +1693,8 @@ app.get("/api/profile/:email", async (req, res) => {
         const userResult = await pool.request()
             .input("email", sql.NVarChar, email)
             .query(`
-                SELECT nombre, email, rol, foto_perfil, mime_type, metodo_pago_pref
-                FROM Usuarios 
+                SELECT nombre, email, rol, foto_perfil, mime_type, metodo_pago_pref, telefono_whatsapp
+                FROM Usuarios
                 WHERE email = @email
             `);
         
@@ -1274,22 +1742,32 @@ app.get("/api/profile/:email", async (req, res) => {
 });
 
 app.post("/api/profile/update", async (req, res) => {
-    const { email, name, password, marca, modelo, placa, roleSwitch, paymentMethod } = req.body;
-    
+    const { email, name, password, marca, modelo, placa, roleSwitch, paymentMethod, telefono } = req.body;
+    const requesterRole = req.headers['user-role'];
+
     let transaction;
-    
+
     try {
+        if (roleSwitch === 'administrador' && requesterRole !== 'administrador') {
+            return res.status(403).json({ message: "No tienes permisos para cambiar a rol administrador" });
+        }
+
         const pool = await poolPromise;
         transaction = new sql.Transaction(pool);
         await transaction.begin();
 
         let updateQuery = `UPDATE Usuarios SET nombre = @nombre, rol = @rol, metodo_pago_pref = @paymentMethod`;
-        
+        let hashedPassword = null;
+
         if (password && password.trim() !== '') {
-            const hashed = await bcrypt.hash(password, 10);
+            hashedPassword = await bcrypt.hash(password, 10);
             updateQuery += `, password = @password`;
         }
-        
+
+        if (telefono !== undefined) {
+            updateQuery += `, telefono_whatsapp = @telefono`;
+        }
+
         updateQuery += ` WHERE email = @email`;
 
         const request = transaction.request()
@@ -1297,9 +1775,13 @@ app.post("/api/profile/update", async (req, res) => {
             .input("nombre", sql.NVarChar, name)
             .input("rol", sql.NVarChar, roleSwitch)
             .input("paymentMethod", sql.NVarChar, paymentMethod);
-        
+
+        if (telefono !== undefined) {
+            request.input("telefono", sql.NVarChar, sanitizePhoneNumber(telefono));
+        }
+
         if (password && password.trim() !== '') {
-            request.input("password", sql.NVarChar, hashed);
+            request.input("password", sql.NVarChar, hashedPassword);
         }
 
         await request.query(updateQuery);
@@ -1476,9 +1958,53 @@ app.post("/api/trips/:id/rate", async (req, res) => {
     }
 });
 
-app.post("/api/emergency/alert", (req, res) => {
-    const { userEmail, location, message } = req.body;
-    res.json({ success: true, message: "Alerta de emergencia enviada" });
+app.post("/api/emergency/alert", async (req, res) => {
+    const { userEmail, location = {}, message, tripId = null } = req.body;
+
+    const lat = location?.lat ?? location?.latitude ?? null;
+    const lon = location?.lon ?? location?.lng ?? location?.longitude ?? null;
+
+    try {
+        const pool = await poolPromise;
+
+        await pool.request()
+            .input("email", sql.NVarChar, userEmail || null)
+            .input("mensaje", sql.NVarChar, message || 'Alerta de emergencia desde UniRiders')
+            .input("lat", sql.Decimal(10, 6), lat !== null ? parseFloat(lat) : null)
+            .input("lon", sql.Decimal(10, 6), lon !== null ? parseFloat(lon) : null)
+            .input("tripId", sql.Int, tripId !== null ? parseInt(tripId) : null)
+            .query(`
+                INSERT INTO AlertasEmergencia (usuario_email, mensaje, ubicacion_lat, ubicacion_lon, trip_id)
+                VALUES (@email, @mensaje, @lat, @lon, @tripId)
+            `);
+
+        const adminContactsResult = await pool.request()
+            .query(`
+                SELECT nombre, email, telefono_whatsapp
+                FROM Usuarios
+                WHERE rol = 'administrador'
+            `);
+
+        const contacts = adminContactsResult.recordset.map(contact => {
+            const normalizedPhone = sanitizePhoneNumber(contact.telefono_whatsapp);
+            const whatsappLink = normalizedPhone ? `https://wa.me/${normalizedPhone}?text=${encodeURIComponent('Alerta de emergencia desde UniRiders. Usuario: ' + (userEmail || 'desconocido'))}` : null;
+
+            return {
+                name: contact.nombre,
+                email: contact.email,
+                phone: contact.telefono_whatsapp,
+                whatsappLink
+            };
+        });
+
+        res.json({
+            success: true,
+            message: "Alerta de emergencia enviada",
+            contacts
+        });
+    } catch (err) {
+        res.status(500).json({ message: "No se pudo registrar la emergencia" });
+    }
 });
 
 // Ruta para obtener detalles completos de un viaje (incluye historial de mensajes)
@@ -1580,6 +2106,9 @@ app.get("/api/trips/:id/details", async (req, res) => {
         res.status(500).json({ message: "Error obteniendo detalles del viaje" });
     }
 });
+
+// Preparar tablas y columnas necesarias para administración
+ensureAdminInfrastructure();
 
 // Inicializar estadísticas al iniciar el servidor
 initializeStatistics();

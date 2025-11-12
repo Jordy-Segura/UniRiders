@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - UniRiders</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body class="admin-body">
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema"></button>
+
+    <header class="admin-header">
+        <div class="admin-header__info">
+            <h1>Centro de control UniRiders</h1>
+            <p>Gestiona usuarios, tarifas y emergencias en tiempo real.</p>
+        </div>
+        <div class="admin-header__actions">
+            <div class="admin-contact" id="adminContactCard">
+                <h2><i class="fas fa-user-shield"></i> Administrador</h2>
+                <p id="adminName">-</p>
+                <p id="adminEmail" class="admin-contact__email">-</p>
+                <form id="adminContactForm">
+                    <label for="adminContactPhone">Número WhatsApp</label>
+                    <input type="tel" id="adminContactPhone" placeholder="Ej: +593987654321" required>
+                    <button type="submit" class="submit-btn small-btn">
+                        <i class="fas fa-save"></i> Guardar contacto
+                    </button>
+                </form>
+            </div>
+            <button id="logoutBtn" class="submit-btn small-btn logout-btn">
+                <i class="fas fa-sign-out-alt"></i> Cerrar sesión
+            </button>
+        </div>
+    </header>
+
+    <main class="admin-grid">
+        <section class="admin-card admin-card--map">
+            <div class="admin-card__header">
+                <h2><i class="fas fa-map"></i> Conductores en vivo</h2>
+                <span class="badge" id="driversCount">0 conductores</span>
+            </div>
+            <div id="adminMap" class="admin-map" role="application" aria-label="Mapa de conductores"></div>
+            <p class="admin-map__hint">Estado en vivo: verde disponible, rojo en viaje.</p>
+        </section>
+
+        <section class="admin-card">
+            <div class="admin-card__header">
+                <h2><i class="fas fa-users-gear"></i> Usuarios</h2>
+                <button id="refreshUsers" class="icon-btn" aria-label="Actualizar usuarios"><i class="fas fa-sync"></i></button>
+            </div>
+            <div class="admin-table__container">
+                <table class="admin-table" id="usersTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Correo</th>
+                            <th>Rol</th>
+                            <th>WhatsApp</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" class="empty-state">Sin usuarios cargados</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <form id="createUserForm" class="admin-form">
+                <h3>Crear usuario manualmente</h3>
+                <div class="form-row">
+                    <input type="text" id="newUserName" placeholder="Nombre completo" required>
+                    <input type="email" id="newUserEmail" placeholder="correo@espoch.edu.ec" required>
+                </div>
+                <div class="form-row">
+                    <input type="password" id="newUserPassword" placeholder="Contraseña temporal" required>
+                    <select id="newUserRole">
+                        <option value="pasajero">Pasajero</option>
+                        <option value="conductor">Conductor</option>
+                        <option value="administrador">Administrador</option>
+                    </select>
+                </div>
+                <div class="form-row">
+                    <input type="tel" id="newUserPhone" placeholder="WhatsApp (opcional)">
+                    <select id="newUserPayment">
+                        <option value="Efectivo">Pago en efectivo</option>
+                        <option value="Transferencia">Transferencia</option>
+                    </select>
+                </div>
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-user-plus"></i> Crear usuario
+                </button>
+            </form>
+        </section>
+
+        <section class="admin-card">
+            <div class="admin-card__header">
+                <h2><i class="fas fa-dollar-sign"></i> Tarifas</h2>
+                <button id="refreshPricing" class="icon-btn" aria-label="Actualizar tarifas"><i class="fas fa-sync"></i></button>
+            </div>
+            <div class="admin-table__container">
+                <table class="admin-table" id="pricingTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Precio</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="5" class="empty-state">Sin tarifas registradas</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <form id="createTariffForm" class="admin-form">
+                <h3>Nueva tarifa</h3>
+                <div class="form-row">
+                    <input type="text" id="tariffName" placeholder="Nombre" required>
+                    <input type="number" id="tariffPrice" placeholder="Precio" min="0" step="0.01" required>
+                </div>
+                <textarea id="tariffDescription" placeholder="Descripción" rows="2"></textarea>
+                <label class="switch">
+                    <input type="checkbox" id="tariffActive" checked>
+                    <span class="slider"></span>
+                    <span class="switch-label">Tarifa activa</span>
+                </label>
+                <button type="submit" class="submit-btn">
+                    <i class="fas fa-plus-circle"></i> Guardar tarifa
+                </button>
+            </form>
+        </section>
+
+        <section class="admin-card admin-card--wide">
+            <div class="admin-card__header">
+                <h2><i class="fas fa-bell"></i> Emergencias</h2>
+                <button id="refreshEmergencies" class="icon-btn" aria-label="Actualizar emergencias"><i class="fas fa-sync"></i></button>
+            </div>
+            <ul id="emergencyList" class="emergency-list">
+                <li class="empty-state">Sin alertas recientes</li>
+            </ul>
+        </section>
+    </main>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="theme.js"></script>
+    <script src="sessionManager.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
