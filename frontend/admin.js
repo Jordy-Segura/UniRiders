@@ -1,6 +1,6 @@
 const API = window.API || "http://localhost:3000/api";
 
-const MASTER_ADMIN_EMAIL = "marcelo2005jmsp@gamil.com";
+const MASTER_ADMIN_EMAIL = "marcelo2005jmsp@gmail.com";
 const MASTER_ADMIN_EMAIL_LOWER = MASTER_ADMIN_EMAIL.toLowerCase();
 
 function normalizeEmailValue(value) {

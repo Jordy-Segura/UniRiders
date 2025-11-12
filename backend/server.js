@@ -40,7 +40,7 @@ const appStatistics = {
     totalEarnings: 0
 };
 
-const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gamil.com';
+const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_LOWER = DEFAULT_ADMIN_EMAIL.toLowerCase();
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
 
