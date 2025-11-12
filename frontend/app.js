@@ -13,6 +13,24 @@ const recoverForm = document.getElementById("recoverForm");
 const sendCodeBtn = document.getElementById("sendCode");
 const resetPassBtn = document.getElementById("resetPass");
 
+const roleRadios = document.querySelectorAll('input[name="role"]');
+roleRadios.forEach(radio => {
+  radio.addEventListener('change', () => {
+    if (radio.checked && radio.value === 'administrador') {
+      if (adminPhoneContainer) adminPhoneContainer.style.display = 'flex';
+      if (adminPhoneHelper) adminPhoneHelper.style.display = 'block';
+      if (adminPhoneInput) adminPhoneInput.setAttribute('required', 'required');
+    } else if (radio.checked) {
+      if (adminPhoneContainer) adminPhoneContainer.style.display = 'none';
+      if (adminPhoneHelper) adminPhoneHelper.style.display = 'none';
+      if (adminPhoneInput) {
+        adminPhoneInput.value = '';
+        adminPhoneInput.removeAttribute('required');
+      }
+    }
+  });
+});
+
 function setButtonLoading(button, isLoading, loadingText = "Procesando...") {
   if (!button) return;
   if (isLoading) {
@@ -81,9 +99,15 @@ registerForm.addEventListener("submit", async e => {
   const password = document.getElementById("regPassword").value.trim();
   const confirm = document.getElementById("regConfirm").value.trim();
   const role = document.querySelector('input[name="role"]:checked').value;
+  const phone = adminPhoneInput ? adminPhoneInput.value.trim() : '';
 
   if (password !== confirm) {
     showToast("Las contraseñas no coinciden", false);
+    return;
+  }
+
+  if (role === 'administrador' && phone.length < 6) {
+    showToast("Ingresa un número de contacto válido", false);
     return;
   }
 
