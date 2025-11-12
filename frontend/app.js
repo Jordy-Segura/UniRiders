@@ -1,18 +1,55 @@
 const API = "http://localhost:3000/api";
 window.API = API;
 
+function normalizeEmailValue(value) {
+  return value ? value.trim().toLowerCase() : "";
+}
+
+function isInstitutionalEmail(email) {
+  return normalizeEmailValue(email).endsWith('@espoch.edu.ec');
+}
+
+function isGmailEmail(email) {
+  return normalizeEmailValue(email).endsWith('@gmail.com');
+}
+
 const loginBtn = document.getElementById("loginBtn");
 const registerBtn = document.getElementById("registerBtn");
 const forgotLink = document.getElementById("forgotLink");
-const backToLogin = document.getElementById("backToLogin"); 
+const backToLogin = document.getElementById("backToLogin");
 const toast = document.getElementById("toast");
+const adminAccessLink = document.getElementById("adminAccessLink");
+const backToLoginFromAdmin = document.getElementById("backToLoginFromAdmin");
 
 const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const recoverForm = document.getElementById("recoverForm");
-
+const adminAccessForm = document.getElementById("adminAccessForm");
 const sendCodeBtn = document.getElementById("sendCode");
 const resetPassBtn = document.getElementById("resetPass");
+const adminRequestCodeBtn = document.getElementById("adminRequestCode");
+const adminVerifyCodeBtn = document.getElementById("adminVerifyCode");
+const adminAccessEmailInput = document.getElementById("adminAccessEmail");
+const adminAccessCodeInput = document.getElementById("adminAccessCode");
+
+let adminAccessEmailNormalized = "";
+
+if (adminAccessCodeInput) adminAccessCodeInput.disabled = true;
+if (adminVerifyCodeBtn) adminVerifyCodeBtn.disabled = true;
+
+function resetAdminAccessState() {
+  adminAccessEmailNormalized = "";
+  if (adminAccessEmailInput) {
+    adminAccessEmailInput.value = "";
+  }
+  if (adminAccessCodeInput) {
+    adminAccessCodeInput.value = "";
+    adminAccessCodeInput.disabled = true;
+  }
+  if (adminVerifyCodeBtn) {
+    adminVerifyCodeBtn.disabled = true;
+  }
+}
 
 function setButtonLoading(button, isLoading, loadingText = "Procesando...") {
   if (!button) return;
@@ -36,30 +73,64 @@ function showToast(msg, success = true) {
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
+function createSessionFromAuth(data) {
+  const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  localStorage.setItem(sessionId + '_userEmail', data.userEmail);
+  localStorage.setItem(sessionId + '_userName', data.userName || 'Usuario');
+  localStorage.setItem(sessionId + '_userRole', data.role);
+  localStorage.setItem('currentSessionId', sessionId);
+  return sessionId;
+}
+
+function redirectAfterAuth(role, sessionId) {
+  if (role === 'administrador') {
+    window.location.href = `admin.html?sessionId=${sessionId}`;
+  } else if (role === 'conductor') {
+    window.location.href = `conductor.html?sessionId=${sessionId}`;
+  } else {
+    window.location.href = `pasajero.html?sessionId=${sessionId}`;
+  }
+}
+
 // Función central para cambiar entre formularios (Estética)
 function switchForm(show) {
-  [loginForm, registerForm, recoverForm].forEach(f => f.classList.remove("active"));
+  [loginForm, registerForm, recoverForm, adminAccessForm].forEach(f => f && f.classList.remove("active"));
   if (show === "login") loginForm.classList.add("active");
   if (show === "register") registerForm.classList.add("active");
   if (show === "recover") recoverForm.classList.add("active");
+  if (show === "admin") adminAccessForm.classList.add("active");
 }
 
 // Eventos de botones de cambio
 loginBtn.onclick = () => {
   loginBtn.classList.add("active");
   registerBtn.classList.remove("active");
+  resetAdminAccessState();
   switchForm("login");
 };
 
 registerBtn.onclick = () => {
   registerBtn.classList.add("active");
   loginBtn.classList.remove("active");
+  resetAdminAccessState();
   switchForm("register");
 };
+
+if (adminAccessLink) {
+  adminAccessLink.addEventListener('click', (event) => {
+    event.preventDefault();
+    loginBtn.classList.remove("active");
+    registerBtn.classList.remove("active");
+    resetAdminAccessState();
+    switchForm("admin");
+    if (adminAccessEmailInput) adminAccessEmailInput.focus();
+  });
+}
 
 forgotLink.onclick = () => {
     loginBtn.classList.remove("active");
     registerBtn.classList.remove("active");
+    resetAdminAccessState();
     switchForm("recover");
 };
 
@@ -67,8 +138,19 @@ backToLogin.onclick = (e) => {
     e.preventDefault();
     loginBtn.classList.add("active");
     registerBtn.classList.remove("active");
+    resetAdminAccessState();
     switchForm("login");
 };
+
+if (backToLoginFromAdmin) {
+  backToLoginFromAdmin.addEventListener('click', (event) => {
+    event.preventDefault();
+    loginBtn.classList.add("active");
+    registerBtn.classList.remove("active");
+    resetAdminAccessState();
+    switchForm("login");
+  });
+}
 
 // -----------------------------------------------------------------
 // LÓGICA DE FORMS
@@ -79,6 +161,7 @@ registerForm.addEventListener("submit", async e => {
   e.preventDefault();
   const name = document.getElementById("regName").value.trim();
   const email = document.getElementById("regEmail").value.trim();
+  const normalizedEmail = normalizeEmailValue(email);
   const password = document.getElementById("regPassword").value.trim();
   const confirm = document.getElementById("regConfirm").value.trim();
   const role = document.querySelector('input[name="role"]:checked').value;
@@ -88,8 +171,8 @@ registerForm.addEventListener("submit", async e => {
     return;
   }
 
-  // Validar correo ESPOCH
-  if (!email.endsWith('@espoch.edu.ec')) {
+  // Validar correo institucional
+  if (!isInstitutionalEmail(email)) {
     showToast("Solo se permiten correos institucionales @espoch.edu.ec", false);
     return;
   }
@@ -97,16 +180,17 @@ registerForm.addEventListener("submit", async e => {
   try {
     const submitBtn = registerForm.querySelector('button[type="submit"]');
     setButtonLoading(submitBtn, true, "Creando cuenta...");
+    const payload = { name, email: normalizedEmail, password, confirm, role };
     const res = await fetch(`${API}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, confirm, role })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
 
     if (res.ok && data.requiresVerification) {
       // Mostrar formulario de verificación
-      showVerificationForm(email, name, password, role);
+      showVerificationForm(normalizedEmail, name, password, role);
       showToast(data.message, true);
     } else {
       showToast(data.message, res.ok);
@@ -130,7 +214,7 @@ function showVerificationForm(email, name, password, role) {
     verificationForm.id = "verificationForm";
     verificationForm.className = "auth-form";
     verificationForm.innerHTML = `
-      <p>📧 Verifica tu correo ESPOCH</p>
+      <p>📧 Verifica tu correo electrónico</p>
       
       <div class="input-container">
         <i class="fas fa-envelope icon"></i>
@@ -222,6 +306,7 @@ loginForm.addEventListener("submit", async e => {
   e.preventDefault();
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPassword").value.trim();
+  const normalizedEmail = normalizeEmailValue(email);
 
   try {
     const submitBtn = loginForm.querySelector('button[type="submit"]');
@@ -229,7 +314,7 @@ loginForm.addEventListener("submit", async e => {
     const res = await fetch(`${API}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: normalizedEmail, password })
     });
     const data = await res.json();
 
@@ -237,25 +322,13 @@ loginForm.addEventListener("submit", async e => {
 
     if (res.ok) {
         if (document.getElementById("rememberMe")?.checked) {
-            localStorage.setItem('rememberedEmail', email);
+            localStorage.setItem('rememberedEmail', normalizedEmail);
         } else {
             localStorage.removeItem('rememberedEmail');
         }
-        // Crear nueva sesión única
-        const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
-        // Guardar datos con prefijo de sesión
-        localStorage.setItem(sessionId + '_userEmail', data.userEmail);
-        localStorage.setItem(sessionId + '_userName', data.userName);
-        localStorage.setItem(sessionId + '_userRole', data.role);
-        localStorage.setItem('currentSessionId', sessionId);
-        
-        // REDIRECCIÓN CON SESSION ID
-        if (data.role === 'conductor') {
-            window.location.href = `conductor.html?sessionId=${sessionId}`; 
-        } else {
-            window.location.href = `pasajero.html?sessionId=${sessionId}`;
-        }
+        const sessionId = createSessionFromAuth(data);
+        redirectAfterAuth(data.role, sessionId);
     }
 
   } catch (err) {
@@ -270,9 +343,10 @@ loginForm.addEventListener("submit", async e => {
 sendCodeBtn.addEventListener("click", async () => {
   const email = document.getElementById("recEmail").value.trim();
   if (!email) return showToast('Ingrese un correo electrónico', false);
-  
-  // Validar correo ESPOCH
-  if (!email.endsWith('@espoch.edu.ec')) {
+  const normalizedEmail = normalizeEmailValue(email);
+
+  // Validar correo institucional
+  if (!isInstitutionalEmail(email)) {
     showToast("Solo se permiten correos institucionales @espoch.edu.ec", false);
     return;
   }
@@ -282,7 +356,7 @@ sendCodeBtn.addEventListener("click", async () => {
     const res = await fetch(`${API}/recover`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email: normalizedEmail })
     });
     const data = await res.json();
     showToast(data.message, res.ok);
@@ -293,6 +367,88 @@ sendCodeBtn.addEventListener("click", async () => {
   }
 });
 
+if (adminRequestCodeBtn) {
+  adminRequestCodeBtn.addEventListener('click', async () => {
+    if (!adminAccessEmailInput) return;
+    const email = adminAccessEmailInput.value.trim();
+
+    if (!email) {
+      showToast('Ingresa el correo Gmail del administrador', false);
+      return;
+    }
+
+    if (!isGmailEmail(email)) {
+      showToast('Solo se permiten correos Gmail para administradores', false);
+      return;
+    }
+
+    const normalizedEmail = normalizeEmailValue(email);
+
+    try {
+      setButtonLoading(adminRequestCodeBtn, true, 'Enviando...');
+      const res = await fetch(`${API}/admin/request-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail })
+      });
+
+      const data = await res.json();
+      showToast(data.message, res.ok);
+
+      if (res.ok) {
+        adminAccessEmailNormalized = normalizedEmail;
+        if (adminAccessCodeInput) {
+          adminAccessCodeInput.disabled = false;
+          adminAccessCodeInput.focus();
+        }
+        if (adminVerifyCodeBtn) {
+          adminVerifyCodeBtn.disabled = false;
+        }
+      }
+    } catch (err) {
+      showToast('Error de conexión', false);
+    } finally {
+      setButtonLoading(adminRequestCodeBtn, false);
+    }
+  });
+}
+
+if (adminVerifyCodeBtn) {
+  adminVerifyCodeBtn.addEventListener('click', async () => {
+    if (!adminAccessEmailNormalized) {
+      showToast('Solicita un código de acceso primero', false);
+      return;
+    }
+
+    const code = adminAccessCodeInput?.value.trim();
+    if (!code || code.length !== 6) {
+      showToast('Ingresa el código de 6 dígitos', false);
+      return;
+    }
+
+    try {
+      setButtonLoading(adminVerifyCodeBtn, true, 'Verificando...');
+      const res = await fetch(`${API}/admin/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: adminAccessEmailNormalized, code })
+      });
+
+      const data = await res.json();
+      showToast(data.message, res.ok);
+
+      if (res.ok) {
+        const sessionId = createSessionFromAuth(data);
+        redirectAfterAuth(data.role, sessionId);
+      }
+    } catch (err) {
+      showToast('Error de conexión', false);
+    } finally {
+      setButtonLoading(adminVerifyCodeBtn, false);
+    }
+  });
+}
+
 // Recuperar contraseña: restablecer
 resetPassBtn.addEventListener("click", async () => {
   const email = document.getElementById("recEmail").value.trim();
@@ -300,13 +456,14 @@ resetPassBtn.addEventListener("click", async () => {
   const newPassword = document.getElementById("recNewPass").value.trim();
 
   if (!email || !code || !newPassword) return showToast('Complete todos los campos', false);
+  const normalizedEmail = normalizeEmailValue(email);
 
   try {
     setButtonLoading(resetPassBtn, true, "Actualizando...");
     const res = await fetch(`${API}/reset`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, code, newPassword })
+      body: JSON.stringify({ email: normalizedEmail, code, newPassword })
     });
     const data = await res.json();
     showToast(data.message, res.ok);
@@ -322,10 +479,10 @@ resetPassBtn.addEventListener("click", async () => {
   }
 });
 
-// Validación en tiempo real para correo ESPOCH en registro
+// Validación en tiempo real para correo permitido en registro
 document.getElementById('regEmail').addEventListener('blur', function() {
   const email = this.value.trim();
-  if (email && !email.endsWith('@espoch.edu.ec')) {
+  if (email && !isInstitutionalEmail(email)) {
     this.style.borderColor = 'red';
     showToast('Solo se permiten correos @espoch.edu.ec', false);
   } else {
@@ -343,4 +500,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     switchForm('login');
     loginBtn.classList.add("active");
+    resetAdminAccessState();
 });

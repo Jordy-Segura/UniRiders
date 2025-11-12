@@ -1261,15 +1261,30 @@
                         message: 'Alerta de emergencia desde la app UniRiders',
                         tripId: currentTrip ? currentTrip.id : null
                     })
-                }).then(() => {
-                    showToast('🚨 ALERTA DE EMERGENCIA ENVIADA', false);
-                    
-                    // Vibrar dispositivo si es compatible
+                }).then(res => res.json().catch(() => ({}))).then(data => {
+                    const message = data && data.message ? data.message : '🚨 Alerta de emergencia enviada';
+                    showToast(message, false);
+
                     if (navigator.vibrate) {
                         navigator.vibrate([500, 200, 500, 200, 500]);
                     }
-                    
-                    // Sonido de alerta (simulado)
+
+                    if (data && Array.isArray(data.contacts) && data.contacts.length > 0) {
+                        const whatsappContact = data.contacts.find(c => c.whatsappLink);
+                        const summary = data.contacts
+                            .filter(c => c.phone)
+                            .map(c => `${c.name || c.email}: ${c.phone}`)
+                            .join('\n');
+
+                        if (summary) {
+                            alert(`Contactos de emergencia notificados:\n${summary}`);
+                        }
+
+                        if (whatsappContact && whatsappContact.whatsappLink) {
+                            window.open(whatsappContact.whatsappLink, '_blank');
+                        }
+                    }
+
                     playEmergencySound();
                 }).catch(error => {
                     showToast('✅ Alerta enviada (modo offline)', false);
