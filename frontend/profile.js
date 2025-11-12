@@ -118,7 +118,10 @@ function updateProfileBadge(totalTrips, rating, role) {
     let badge = 'Explorador';
     let description = 'Sigue viajando para desbloquear nuevas insignias.';
 
-    if (role === 'conductor' && totalTrips >= 20) {
+    if (role === 'administrador') {
+        badge = 'Guardian de UniRiders';
+        description = 'Supervisas la seguridad y coordinas a la comunidad.';
+    } else if (role === 'conductor' && totalTrips >= 20) {
         badge = 'Guía experto';
         description = 'Tu moto es referencia en la comunidad UniRiders.';
     } else if (totalTrips >= 15) {
@@ -151,9 +154,19 @@ async function loadProfileData() {
 
             // Actualizar interfaz
             document.getElementById('profileName').textContent = user.nombre || 'Usuario';
-            document.getElementById('currentRole').textContent = `Rol actual: ${user.rol === 'conductor' ? 'Conductor' : 'Pasajero'}`;
+            const roleDisplayMap = {
+                conductor: 'Conductor',
+                pasajero: 'Pasajero',
+                administrador: 'Administrador'
+            };
+            const roleLabel = roleDisplayMap[user.rol] || 'Pasajero';
+            document.getElementById('currentRole').textContent = `Rol actual: ${roleLabel}`;
             document.getElementById('name').value = user.nombre || '';
             document.getElementById('email').value = user.email || '';
+            const phoneInput = document.getElementById('contactPhone');
+            if (phoneInput) {
+                phoneInput.value = user.telefono_whatsapp || '';
+            }
 
             if (profileGreetingEl) {
                 const firstName = (user.nombre || '').split(' ')[0] || 'rider';
@@ -169,7 +182,14 @@ async function loadProfileData() {
 
             // Opciones
             document.getElementById('paymentMethod').value = user.metodo_pago_pref || 'Efectivo';
-            document.getElementById('roleSwitch').value = user.rol || 'pasajero';
+            const roleSelect = document.getElementById('roleSwitch');
+            if (roleSelect) {
+                roleSelect.value = user.rol || 'pasajero';
+                const adminOption = roleSelect.querySelector('option[value="administrador"]');
+                if (adminOption && userRole !== 'administrador') {
+                    adminOption.disabled = true;
+                }
+            }
 
             // Campos de vehículo
             if (user.rol === 'conductor') {
@@ -282,6 +302,7 @@ document.getElementById('updateProfileForm').addEventListener('submit', async (e
     const confirmPassword = document.getElementById('confirmPassword').value;
     const roleSwitchValue = document.getElementById('roleSwitch').value;
     const paymentMethodValue = document.getElementById('paymentMethod').value;
+    const contactPhone = document.getElementById('contactPhone')?.value || '';
 
     let marca = '', modelo = '', placa = '';
 
@@ -296,37 +317,51 @@ document.getElementById('updateProfileForm').addEventListener('submit', async (e
         marca = document.getElementById('marca').value;
         modelo = document.getElementById('modelo').value;
         placa = document.getElementById('placa').value;
-        
+
         if (!marca || !modelo || !placa) {
             showToast('Faltan datos del vehículo', false);
             return;
         }
     }
 
+    if (roleSwitchValue === 'administrador' && contactPhone.trim().length < 6) {
+        showToast('El administrador debe registrar un número de contacto válido', false);
+        return;
+    }
+
     try {
         const res = await fetch(`${API}/profile/update`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email, 
-                name, 
+            headers: {
+                'Content-Type': 'application/json',
+                'user-role': userRole || roleSwitchValue
+            },
+            body: JSON.stringify({
+                email,
+                name,
                 password: password || undefined,
                 rol: roleSwitchValue,
                 roleSwitch: roleSwitchValue,
                 paymentMethod: paymentMethodValue,
-                marca, 
-                modelo, 
-                placa 
+                marca,
+                modelo,
+                placa,
+                telefono: contactPhone || undefined
             })
         });
 
         const data = await res.json();
-        
+
         if (res.ok) {
             showToast(data.message, true);
             document.getElementById('profileName').textContent = name;
-            document.getElementById('currentRole').textContent = `Rol actual: ${roleSwitchValue === 'conductor' ? 'Conductor' : 'Pasajero'}`;
-            
+            const roleDisplayMap = {
+                conductor: 'Conductor',
+                pasajero: 'Pasajero',
+                administrador: 'Administrador'
+            };
+            document.getElementById('currentRole').textContent = `Rol actual: ${roleDisplayMap[roleSwitchValue] || 'Pasajero'}`;
+
             // Actualizar localStorage
             if (sessionId) {
                 localStorage.setItem(sessionId + '_userName', name);
