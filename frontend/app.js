@@ -10,10 +10,6 @@ const toast = document.getElementById("toast");
 const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const recoverForm = document.getElementById("recoverForm");
-const adminPhoneContainer = document.getElementById("adminPhoneContainer");
-const adminPhoneHelper = document.getElementById("adminPhoneHelper");
-const adminPhoneInput = document.getElementById("adminPhone");
-
 const sendCodeBtn = document.getElementById("sendCode");
 const resetPassBtn = document.getElementById("resetPass");
 
@@ -125,9 +121,6 @@ registerForm.addEventListener("submit", async e => {
     const submitBtn = registerForm.querySelector('button[type="submit"]');
     setButtonLoading(submitBtn, true, "Creando cuenta...");
     const payload = { name, email, password, confirm, role };
-    if (phone) {
-      payload.phone = phone;
-    }
     const res = await fetch(`${API}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
