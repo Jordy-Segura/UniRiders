@@ -828,10 +828,11 @@
                 <img id="driverProfilePic" src="/img/default_avatar.jpg" style="width: 40px; height: 40px; border-radius: 50%; border: 2px solid white; object-fit: cover;">
                 <div>
                     <h2 style="font-size: 1.5em; margin: 0;">
-                        <span id="userNameDisplay">Conductor</span> 
+                        <span id="userNameDisplay">Conductor</span>
                         <span class="pro-mode-indicator">PRO</span>
                         <span class="achievement-badge">⭐ 4.8</span>
                     </h2>
+                    <span class="live-clock-chip" id="driverLiveClock" data-live-clock>--:--:--</span>
                 </div>
             </div>
             <div>
@@ -852,7 +853,10 @@
             </div>
             <div class="stat-item">
                 <span><i class="fas fa-star-half-alt"></i> Calificación promedio:</span>
-                <span class="rating-stars">★★★★★</span>
+                <div class="stat-item__value">
+                    <span class="rating-stars" id="driverRatingStars">★★★★★</span>
+                    <strong id="driverAvgRatingValue">--</strong>
+                </div>
             </div>
             <div class="stat-item">
                 <span><i class="fas fa-wallet"></i> Ingresos totales:</span>
@@ -1016,6 +1020,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
     <script>
         const API = "http://localhost:3000/api";
         
@@ -1034,6 +1039,8 @@
         const activeTripPanel = document.getElementById('activeTripPanel');
         const mapElement = document.getElementById('map');
         const mapFrame = document.getElementById('mapFrame');
+        const driverRatingStarsEl = document.getElementById('driverRatingStars');
+        const driverAvgRatingValueEl = document.getElementById('driverAvgRatingValue');
         const navigationActions = document.getElementById('navigationActions');
         const startNavigationBtn = document.getElementById('startNavigationBtn');
         const passengerLocationDisplay = document.getElementById('passengerLocationDisplay');
@@ -1153,7 +1160,7 @@
                             <strong>${trip.origen} → ${trip.destino}</strong>
                             <div style="font-size: 0.8em; color: #ccc;">
                                 ${formattedDate}
-                                ${trip.estado === 'COMPLETADO' ? ' - Completado' : ' - En curso'}
+                                ${trip.estado === 'finalizado' ? ' - Completado' : ' - En curso'}
                                 ${trip.costo ? ` - $${trip.costo}` : ''}
                             </div>
                         </div>
@@ -1334,22 +1341,27 @@
                     averageTripTimeEl.textContent = `${simulatedAverage} min`;
                 }
 
-                // Actualizar estrellas según rating
-                const ratingStars = document.querySelector('.rating-stars');
-                if (ratingStars) {
-                    const rating = parseFloat(stats.avgRating);
-                    const fullStars = Math.floor(rating);
-                    const hasHalfStar = rating % 1 >= 0.5;
-                    let stars = '★'.repeat(fullStars);
+                const ratingValue = parseFloat(stats.avgRating || 0);
+
+                if (driverRatingStarsEl) {
+                    const fullStars = Math.floor(ratingValue);
+                    const hasHalfStar = ratingValue % 1 >= 0.5;
+                    let stars = '★'.repeat(Math.max(fullStars, 0));
                     if (hasHalfStar) stars += '½';
-                    stars += '☆'.repeat(5 - fullStars - (hasHalfStar ? 1 : 0));
-                    ratingStars.innerHTML = stars;
+                    const remaining = 5 - fullStars - (hasHalfStar ? 1 : 0);
+                    if (remaining > 0) {
+                        stars += '☆'.repeat(remaining);
+                    }
+                    driverRatingStarsEl.textContent = stars;
                 }
 
-                // Actualizar badge visible en el header (antes estaba estático)
+                if (driverAvgRatingValueEl) {
+                    driverAvgRatingValueEl.textContent = Number.isNaN(ratingValue) ? '--' : ratingValue.toFixed(1);
+                }
+
                 const headerBadge = document.querySelector('.achievement-badge');
-                if (headerBadge && stats.avgRating != null) {
-                    headerBadge.textContent = `⭐ ${parseFloat(stats.avgRating).toFixed(1)}`;
+                if (headerBadge && !Number.isNaN(ratingValue)) {
+                    headerBadge.textContent = `⭐ ${ratingValue.toFixed(1)}`;
                 }
                 
             } catch (error) {
@@ -2149,7 +2161,7 @@
                 
                 const tripDetails = await detailsRes.json();
                 
-                if (tripDetails.estado !== 'ACEPTADO') {
+                if (tripDetails.estado !== 'aceptado') {
                     showToast('❌ El viaje ya no está activo', false);
                     return;
                 }
@@ -2183,7 +2195,7 @@
                     origin: tripDetails.origen,
                     destination: tripDetails.destino,
                     payment: tripDetails.metodo_pago,
-                    status: 'ACEPTADO'
+                    status: 'aceptado'
                 };
                 
                 // Actualizar UI

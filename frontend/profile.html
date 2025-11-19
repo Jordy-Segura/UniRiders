@@ -20,6 +20,7 @@
             <div class="hero-heading">
                 <h1>Perfil UniRiders</h1>
                 <p id="profileGreeting">Personaliza tu experiencia rider en segundos.</p>
+                <span class="live-clock-chip" id="profileLiveClock" data-live-clock>--:--:--</span>
             </div>
         </div>
 
@@ -153,10 +154,6 @@
                     <i class="fas fa-code-fork icon"></i>
                     <input type="text" id="modelo" placeholder="Modelo (ej. MT-03)">
                 </div>
-                <div class="input-container">
-                    <i class="fas fa-id-card icon"></i>
-                    <input type="text" id="placa" placeholder="Placa (ej. ABC-123)">
-                </div>
             </div>
 
             <button type="submit" class="submit-btn">
@@ -172,6 +169,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
     <script src="profile.js"></script>
 
     <style>
@@ -209,6 +207,18 @@
             margin: 0;
             font-size: 0.9em;
             color: rgba(255, 255, 255, 0.8);
+        }
+
+        .live-clock-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.85em;
+            letter-spacing: 0.4px;
+            margin-top: 6px;
         }
 
         .profile-insights {

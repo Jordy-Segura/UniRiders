@@ -1,4 +1,6 @@
 const API = window.API || "http://localhost:3000/api";
+const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
+const DEFAULT_ADMIN_EMAIL_NORMALIZED = DEFAULT_ADMIN_EMAIL.toLowerCase();
 
 function normalizeEmailValue(value) {
     return value ? value.trim().toLowerCase() : '';
@@ -17,6 +19,13 @@ const driverMarkers = new Map();
 let adminEmail = '';
 let adminName = '';
 let sessionId = '';
+let adminStatsInterval = null;
+
+const currencyFormatter = new Intl.NumberFormat('es-EC', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+});
 
 const driversCountEl = document.getElementById('driversCount');
 const usersTableBody = document.querySelector('#usersTable tbody');
@@ -25,6 +34,17 @@ const emergencyList = document.getElementById('emergencyList');
 const adminContactPhoneInput = document.getElementById('adminContactPhone');
 const adminNameEl = document.getElementById('adminName');
 const adminEmailEl = document.getElementById('adminEmail');
+const adminKeyForm = document.getElementById('adminKeyForm');
+const adminNewKeyInput = document.getElementById('adminNewKey');
+const adminCurrentKeyInput = document.getElementById('adminCurrentKey');
+const adminCurrentKeyWrapper = document.getElementById('adminCurrentKeyWrapper');
+const adminKeyHint = document.getElementById('adminKeyHint');
+const kpiActiveDriversValue = document.getElementById('kpiActiveDriversValue');
+const kpiActiveDriversInfo = document.getElementById('kpiActiveDriversInfo');
+const kpiActiveUsersValue = document.getElementById('kpiActiveUsersValue');
+const kpiCompletedTodayValue = document.getElementById('kpiCompletedTodayValue');
+const kpiCompletedTodayInfo = document.getElementById('kpiCompletedTodayInfo');
+const kpiEarningsValue = document.getElementById('kpiEarningsValue');
 
 function showToast(message, success = true) {
     const toast = document.getElementById('toast');
@@ -242,8 +262,16 @@ function renderEmergencies(emergencies) {
             month: 'short'
         }) : 'N/D';
 
-        const locationText = alert.ubicacion_lat && alert.ubicacion_lon
-            ? `Lat: ${alert.ubicacion_lat.toFixed(4)}, Lon: ${alert.ubicacion_lon.toFixed(4)}`
+        const latValue = typeof alert.ubicacion_lat === 'number'
+            ? alert.ubicacion_lat
+            : parseFloat(alert.ubicacion_lat);
+        const lonValue = typeof alert.ubicacion_lon === 'number'
+            ? alert.ubicacion_lon
+            : parseFloat(alert.ubicacion_lon);
+        const hasLocation = Number.isFinite(latValue) && Number.isFinite(lonValue);
+
+        const locationText = hasLocation
+            ? `Lat: ${latValue.toFixed(4)}, Lon: ${lonValue.toFixed(4)}`
             : 'Ubicación no disponible';
 
         li.innerHTML = `
@@ -254,9 +282,9 @@ function renderEmergencies(emergencies) {
             <p>${alert.mensaje || 'Alerta recibida sin descripción'}</p>
             <span class="emergency-card__meta">${locationText}</span>
             <div class="emergency-card__actions">
-                ${alert.ubicacion_lat && alert.ubicacion_lon ? `<button class="submit-btn small-btn" data-action="focus-map" data-lat="${alert.ubicacion_lat}" data-lon="${alert.ubicacion_lon}"><i class="fas fa-location-arrow"></i> Ver en mapa</button>` : ''}
+                ${hasLocation ? `<button type="button" class="submit-btn small-btn" data-action="focus-map" data-lat="${latValue}" data-lon="${lonValue}"><i class="fas fa-location-arrow"></i> Ver en mapa</button>` : ''}
                 ${alert.atendido ? `<span class="badge" style="background: rgba(34,197,94,0.15); color: #16a34a;">Atendido por ${alert.atendido_por || 'administración'}</span>`
-                : `<button class="submit-btn small-btn" data-action="resolve" data-id="${alert.id}"><i class="fas fa-check"></i> Marcar atendido</button>`}
+                : `<button type="button" class="submit-btn small-btn" data-action="resolve" data-id="${alert.id}"><i class="fas fa-check"></i> Marcar atendido</button>`}
             </div>
         `;
 
@@ -273,6 +301,51 @@ async function loadEmergencies() {
     } catch (error) {
         renderEmergencies([]);
         showToast('No fue posible cargar las emergencias', false);
+    }
+}
+
+async function refreshAdminStats() {
+    try {
+        const [overviewRes, driversRes] = await Promise.all([
+            fetch(`${API}/stats/overview`, { cache: 'no-store' }),
+            fetch(`${API}/drivers/active`, { cache: 'no-store' })
+        ]);
+
+        if (overviewRes.ok) {
+            const stats = await overviewRes.json();
+            if (kpiActiveUsersValue) {
+                kpiActiveUsersValue.textContent = stats.activeUsers ?? 0;
+            }
+            const completedToday = stats.completedToday ?? stats.completedTrips ?? 0;
+            if (kpiCompletedTodayValue) {
+                kpiCompletedTodayValue.textContent = completedToday;
+            }
+            if (kpiCompletedTodayInfo && stats.syncedAt) {
+                const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                kpiCompletedTodayInfo.textContent = `Actualizado ${formatted}`;
+            }
+            if (kpiEarningsValue) {
+                kpiEarningsValue.textContent = currencyFormatter.format(Number(stats.totalEarnings || 0));
+            }
+        }
+
+        if (driversRes.ok) {
+            const driverData = await driversRes.json();
+            if (kpiActiveDriversValue) {
+                kpiActiveDriversValue.textContent = driverData.available ?? driverData.count ?? 0;
+            }
+            if (kpiActiveDriversInfo) {
+                const formatted = driverData.lastUpdated
+                    ? new Date(driverData.lastUpdated).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+                    : 'Sincronizando';
+                kpiActiveDriversInfo.textContent = `Total conectados: ${driverData.count ?? 0} • ${formatted}`;
+            }
+        }
+
+    } catch (error) {
+        if (kpiActiveDriversInfo) {
+            kpiActiveDriversInfo.textContent = 'Sin datos en vivo';
+        }
     }
 }
 
@@ -388,23 +461,90 @@ async function resolveEmergency(id) {
 }
 
 function focusEmergencyOnMap(lat, lon) {
-    if (!adminMap) return;
     const numericLat = parseFloat(lat);
     const numericLon = parseFloat(lon);
     if (Number.isNaN(numericLat) || Number.isNaN(numericLon)) return;
 
-    adminMap.setView([numericLat, numericLon], 16);
-    const pulseMarker = L.circleMarker([numericLat, numericLon], {
-        radius: 12,
-        color: '#f97316',
-        fillColor: '#fb923c',
-        fillOpacity: 0.8,
-        weight: 2
-    }).addTo(adminMap);
+    if (adminMap) {
+        adminMap.setView([numericLat, numericLon], 16);
+        const pulseMarker = L.circleMarker([numericLat, numericLon], {
+            radius: 12,
+            color: '#f97316',
+            fillColor: '#fb923c',
+            fillOpacity: 0.8,
+            weight: 2
+        }).addTo(adminMap);
 
-    setTimeout(() => {
-        adminMap.removeLayer(pulseMarker);
-    }, 8000);
+        setTimeout(() => {
+            adminMap.removeLayer(pulseMarker);
+        }, 8000);
+    }
+
+    const mapsUrl = `https://www.google.com/maps?q=${numericLat},${numericLon}`;
+    window.open(mapsUrl, '_blank', 'noopener');
+}
+
+function isDefaultAdminSession() {
+    return normalizeEmailValue(adminEmail) === DEFAULT_ADMIN_EMAIL_NORMALIZED;
+}
+
+function updateAdminKeyFormState() {
+    if (!adminKeyForm) return;
+    const isDefault = isDefaultAdminSession();
+    if (adminKeyHint) {
+        adminKeyHint.textContent = isDefault
+            ? 'Eres el administrador maestro: crea tu contraseña sin ingresar la clave actual.'
+            : 'Por seguridad ingresa tu clave actual antes de actualizarla.';
+    }
+
+    if (adminCurrentKeyWrapper) {
+        adminCurrentKeyWrapper.style.display = isDefault ? 'none' : '';
+    }
+
+    if (adminCurrentKeyInput) {
+        if (isDefault) {
+            adminCurrentKeyInput.value = '';
+            adminCurrentKeyInput.removeAttribute('required');
+        } else {
+            adminCurrentKeyInput.setAttribute('required', 'required');
+        }
+    }
+}
+
+async function saveAdminLoginKey(event) {
+    event.preventDefault();
+    if (!adminNewKeyInput) return;
+
+    const newPassword = adminNewKeyInput.value.trim();
+    const currentPassword = adminCurrentKeyInput?.value.trim();
+
+    if (!newPassword || newPassword.length < 8) {
+        showToast('La nueva clave debe tener al menos 8 caracteres', false);
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API}/admin/login-key`, {
+            method: 'POST',
+            headers: baseHeaders(),
+            body: JSON.stringify({
+                newPassword,
+                currentPassword: currentPassword || undefined
+            })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'No se pudo guardar la clave');
+
+        adminNewKeyInput.value = '';
+        if (adminCurrentKeyInput) {
+            adminCurrentKeyInput.value = '';
+        }
+
+        showToast(data.message || 'Clave actualizada');
+    } catch (error) {
+        showToast(error.message || 'Error al guardar la clave', false);
+    }
 }
 
 async function updateAdminContact(event) {
@@ -527,6 +667,9 @@ function attachEventListeners() {
     document.getElementById('newUserRole').addEventListener('change', updateManualUserPasswordRequirement);
     document.getElementById('createTariffForm').addEventListener('submit', createTariff);
     document.getElementById('adminContactForm').addEventListener('submit', updateAdminContact);
+    if (adminKeyForm) {
+        adminKeyForm.addEventListener('submit', saveAdminLoginKey);
+    }
     document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionManager.clearSession();
         window.location.href = 'Index.html';
@@ -596,11 +739,20 @@ function bootstrapAdminPanel() {
     initializeMap();
     attachEventListeners();
     updateManualUserPasswordRequirement();
+    updateAdminKeyFormState();
     loadUsers();
     loadPricing();
     loadEmergencies();
+    refreshAdminStats();
 
     setInterval(loadEmergencies, 20000);
+    adminStatsInterval = setInterval(refreshAdminStats, 15000);
 }
 
 document.addEventListener('DOMContentLoaded', bootstrapAdminPanel);
+
+window.addEventListener('beforeunload', () => {
+    if (adminStatsInterval) {
+        clearInterval(adminStatsInterval);
+    }
+});

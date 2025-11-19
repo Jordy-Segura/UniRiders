@@ -153,6 +153,10 @@
             <i class="fas fa-shield-alt"></i>
             <span>Conexión segura</span>
         </div>
+        <div class="stat-item">
+            <i class="fas fa-clock"></i>
+            <span id="landingLiveClock" data-live-clock>--:--:--</span>
+        </div>
     </div>
 
     <div class="auth-container">
@@ -217,7 +221,7 @@
                     <i class="fas fa-envelope icon"></i>
                     <input type="email" id="regEmail" placeholder="correo@espoch.edu.ec" required>
                     <div class="input-focus-effect"></div>
-                    <div class="email-hint">Solo correos institucionales @espoch.edu.ec (excepto el administrador autorizado)</div>
+                    <div class="email-hint">Solo correos institucionales @espoch.edu.ec</div>
                 </div>
                 
                 <div class="input-container">
@@ -250,23 +254,7 @@
                             <span>Conductor</span>
                         </span>
                     </label>
-                    <label class="role-option">
-                        <input type="radio" name="role" value="administrador">
-                        <span class="role-option__content">
-                            <i class="fas fa-user-shield"></i>
-                            <span>Administrador</span>
-                        </span>
-                    </label>
                 </div>
-
-                <div class="input-container" id="adminPhoneContainer" style="display: none;">
-                    <i class="fas fa-phone icon"></i>
-                    <input type="tel" id="adminPhone" placeholder="Teléfono de contacto WhatsApp" pattern="[0-9+ ]{6,}" autocomplete="tel">
-                    <div class="input-focus-effect"></div>
-                </div>
-                <p id="adminPhoneHelper" style="display: none; font-size: 0.75em; color: #666; margin-top: -10px; margin-bottom: 10px;">
-                    Necesitamos tu número para enviar alertas de emergencia por WhatsApp.
-                </p>
 
                 <div style="margin: 15px 0;">
                     <label style="color: #666; font-size: 0.8em;">
@@ -351,6 +339,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
     <script src="app.js"></script>
     <script>
         // Partículas animadas
