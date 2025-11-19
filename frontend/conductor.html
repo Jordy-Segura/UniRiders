@@ -1153,7 +1153,7 @@
                             <strong>${trip.origen} → ${trip.destino}</strong>
                             <div style="font-size: 0.8em; color: #ccc;">
                                 ${formattedDate}
-                                ${trip.estado === 'COMPLETADO' ? ' - Completado' : ' - En curso'}
+                                ${trip.estado === 'finalizado' ? ' - Completado' : ' - En curso'}
                                 ${trip.costo ? ` - $${trip.costo}` : ''}
                             </div>
                         </div>
@@ -2149,7 +2149,7 @@
                 
                 const tripDetails = await detailsRes.json();
                 
-                if (tripDetails.estado !== 'ACEPTADO') {
+                if (tripDetails.estado !== 'aceptado') {
                     showToast('❌ El viaje ya no está activo', false);
                     return;
                 }
@@ -2183,7 +2183,7 @@
                     origin: tripDetails.origen,
                     destination: tripDetails.destino,
                     payment: tripDetails.metodo_pago,
-                    status: 'ACEPTADO'
+                    status: 'aceptado'
                 };
                 
                 // Actualizar UI

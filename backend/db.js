@@ -4,7 +4,7 @@ const config = {
   user: 'sa',          // ej: 'sa' o el que uses
   password: 'sql',   // ej: '12345'
   server: 'localhost',         // o el nombre de tu instancia: 'localhost\\SQLEXPRESS'
-  database: 'UniRiders',
+  database: 'UniRidersDB',
   options: {
     encrypt: false, // true si usas Azure
     trustServerCertificate: true

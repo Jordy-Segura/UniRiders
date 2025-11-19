@@ -197,7 +197,6 @@ async function loadProfileData() {
                 document.getElementById('vehicleFields').style.display = 'block';
                 document.getElementById('marca').value = vehicle.marca || '';
                 document.getElementById('modelo').value = vehicle.modelo || '';
-                document.getElementById('placa').value = vehicle.placa || '';
             } else {
                 document.getElementById('vehicleHeader').style.display = 'none';
                 document.getElementById('vehicleFields').style.display = 'none';
@@ -304,7 +303,7 @@ document.getElementById('updateProfileForm').addEventListener('submit', async (e
     const paymentMethodValue = document.getElementById('paymentMethod').value;
     const contactPhone = document.getElementById('contactPhone')?.value || '';
 
-    let marca = '', modelo = '', placa = '';
+    let marca = '', modelo = '';
 
     // Validar contraseñas
     if (password && password !== confirmPassword) {
@@ -316,9 +315,8 @@ document.getElementById('updateProfileForm').addEventListener('submit', async (e
     if (roleSwitchValue === 'conductor') {
         marca = document.getElementById('marca').value;
         modelo = document.getElementById('modelo').value;
-        placa = document.getElementById('placa').value;
 
-        if (!marca || !modelo || !placa) {
+        if (!marca || !modelo) {
             showToast('Faltan datos del vehículo', false);
             return;
         }
@@ -345,7 +343,6 @@ document.getElementById('updateProfileForm').addEventListener('submit', async (e
                 paymentMethod: paymentMethodValue,
                 marca,
                 modelo,
-                placa,
                 telefono: contactPhone || undefined
             })
         });
