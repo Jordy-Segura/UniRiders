@@ -656,8 +656,8 @@
             const modal = document.getElementById('tripModal');
             const modalBody = document.getElementById('modalBody');
             
-            const isCompleted = trip.estado === 'COMPLETADO';
-            const isActive = trip.estado === 'ACEPTADO';
+            const isCompleted = trip.estado === 'finalizado';
+            const isActive = trip.estado === 'aceptado';
             const canRate = isCompleted && !hasRated(trip);
             
             modalBody.innerHTML = `
@@ -777,24 +777,24 @@
         // Funciones auxiliares
         function getStatusClass(status) {
             const statusMap = {
-                'PENDIENTE': 'status-pendiente',
-                'ACEPTADO': 'status-activo',
+                'pendiente': 'status-pendiente',
+                'aceptado': 'status-activo',
                 'EN_CURSO': 'status-activo',
-                'COMPLETADO': 'status-completado',
-                'CANCELADO': 'status-cancelado',
-                'FINALIZADO': 'status-completado'
+                'finalizado': 'status-completado',
+                'cancelado': 'status-cancelado',
+                'CANCELADO': 'status-cancelado'
             };
             return statusMap[status] || 'status-pendiente';
         }
 
         function getStatusText(status) {
             const statusMap = {
-                'PENDIENTE': 'Pendiente',
-                'ACEPTADO': 'En Curso',
+                'pendiente': 'Pendiente',
+                'aceptado': 'En Curso',
                 'EN_CURSO': 'En Curso',
-                'COMPLETADO': 'Completado',
-                'CANCELADO': 'Cancelado',
-                'FINALIZADO': 'Completado'
+                'finalizado': 'Completado',
+                'cancelado': 'Cancelado',
+                'CANCELADO': 'Cancelado'
             };
             return statusMap[status] || status;
         }
