@@ -1382,7 +1382,7 @@ app.post("/api/trips/accept", async (req, res) => {
         // Actualizar en base de datos
         try {
             await pool.request()
-                .input("tripId", sql.Int, numericTripId)
+                .input("tripId", sql.Int, trip.id)
                 .input("driverEmail", sql.NVarChar, driverEmail)
                 .query(`
                     UPDATE Viajes SET conductor_email = @driverEmail
