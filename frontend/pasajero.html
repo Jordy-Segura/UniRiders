@@ -704,6 +704,23 @@
             color: #111;
         }
 
+        .live-clock-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8em;
+            padding: 4px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            margin-top: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        body.dark-mode .live-clock-chip {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
     </style>
 </head>
 <body>
@@ -730,6 +747,7 @@
                         Pasajero Premium UniRiders
                         <span class="achievement-badge" style="background: var(--color-oro); color: #333; padding: 2px 6px; border-radius: 8px; font-size: 0.7em; margin-left: 5px;">⭐ 4.9</span>
                     </p>
+                    <span class="live-clock-chip" id="passengerLiveClock" data-live-clock>--:--:--</span>
                 </div>
             </div>
             <button class="profile-btn">⚙️</button>
@@ -760,6 +778,7 @@
                 <div>
                     <strong id="activeDriversCount">--</strong>
                     <span>Motos activas cerca</span>
+                    <span class="body-note" id="activeDriversSyncTime">Sincronizando...</span>
                 </div>
             </div>
             <div class="highlight-card">
@@ -767,6 +786,13 @@
                 <div>
                     <strong id="safetyScore">100%</strong>
                     <span>Seguridad en los últimos viajes</span>
+                </div>
+            </div>
+            <div class="highlight-card">
+                <i class="fas fa-star"></i>
+                <div>
+                    <strong id="passengerAvgRatingValue">--</strong>
+                    <span>Promedio recibido</span>
                 </div>
             </div>
         </div>
@@ -876,6 +902,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
     <script>
         const API = "http://localhost:3000/api";
         
@@ -903,7 +930,9 @@
         const loyaltyTripsLabel = document.getElementById('loyaltyTrips');
         const loyaltyTagline = document.getElementById('loyaltyTagline');
         const activeDriversCountEl = document.getElementById('activeDriversCount');
+        const activeDriversSyncEl = document.getElementById('activeDriversSyncTime');
         const safetyScoreEl = document.getElementById('safetyScore');
+        const passengerAvgRatingValueEl = document.getElementById('passengerAvgRatingValue');
         const moodInputs = document.querySelectorAll('#travelMood input[type="checkbox"]');
 
         const moodStorageKey = userEmail ? `passengerMood_${userEmail}` : 'passengerMood_guest';
@@ -974,24 +1003,42 @@
             if (!API) return;
 
             try {
-                const res = await fetch(`${API}/stats/overview`, { signal });
-                if (!res.ok) return;
-                const stats = await res.json();
+                const [overviewRes, driversRes] = await Promise.all([
+                    fetch(`${API}/stats/overview`, { signal }),
+                    fetch(`${API}/drivers/active`, { signal })
+                ]);
 
-                if (activeDriversCountEl) {
-                    const computedDrivers = Math.max(Number(stats.activeTrips || 0) * 2, Number(stats.activeUsers || 0));
-                    activeDriversCountEl.textContent = Math.max(computedDrivers, 8);
+                if (overviewRes.ok) {
+                    const stats = await overviewRes.json();
+                    if (safetyScoreEl) {
+                        const base = Number(stats.completedTrips || 0);
+                        const safeScore = Math.min(100, 92 + (base % 8));
+                        safetyScoreEl.textContent = `${safeScore}%`;
+                    }
                 }
 
-                if (safetyScoreEl) {
-                    const base = Number(stats.completedTrips || 0);
-                    const safeScore = Math.min(100, 92 + (base % 8));
-                    safetyScoreEl.textContent = `${safeScore}%`;
+                if (driversRes.ok) {
+                    const driverData = await driversRes.json();
+                    if (activeDriversCountEl) {
+                        const available = Number(driverData.available ?? driverData.count ?? 0);
+                        activeDriversCountEl.textContent = Math.max(available, 0);
+                    }
+                    if (activeDriversSyncEl) {
+                        if (driverData.lastUpdated) {
+                            const formatted = new Date(driverData.lastUpdated).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                            activeDriversSyncEl.textContent = `Actualizado ${formatted}`;
+                        } else {
+                            activeDriversSyncEl.textContent = 'En vivo';
+                        }
+                    }
                 }
 
             } catch (error) {
                 if (activeDriversCountEl && activeDriversCountEl.textContent === '--') {
                     activeDriversCountEl.textContent = '12';
+                }
+                if (activeDriversSyncEl) {
+                    activeDriversSyncEl.textContent = 'Sin señal';
                 }
             }
         }
@@ -1069,7 +1116,7 @@
                             <strong>${trip.origen} → ${trip.destino}</strong>
                             <div style="font-size: 0.8em; color: #ccc;">
                                 ${formattedDate}
-                                ${trip.estado === 'COMPLETADO' ? ' - Completado' : ' - En curso'}
+                                ${trip.estado === 'finalizado' ? ' - Completado' : ' - En curso'}
                                 ${trip.costo ? ` - $${trip.costo}` : ''}
                             </div>
                         </div>
@@ -1493,7 +1540,7 @@
                 });
                 const data = await res.json();
 
-                if (data.status === 'ACEPTADO') {
+                if (data.status === 'aceptado') {
                     clearInterval(pollingStatusInterval);
                     pollingStatusInterval = null;
 
@@ -1523,10 +1570,10 @@
                     startChatSession(currentTripId);
                     startDriverLocationPolling(currentTripId);
 
-                } else if (data.status === 'PENDIENTE') {
+                } else if (data.status === 'pendiente') {
                     messageArea.innerText = "🔄 Esperando que un conductor acepte la oferta...";
-                } else if (data.status === 'FINALIZADO') {
-                    // VIAJE FINALIZADO AUTOMÁTICAMENTE
+                } else if (data.status === 'finalizado') {
+                    // VIAJE finalizado AUTOMÁTICAMENTE
                     clearInterval(pollingStatusInterval);
                     pollingStatusInterval = null;
                     
@@ -1924,7 +1971,7 @@
                 
                 const data = await res.json();
                 
-                if (data.status === 'ACEPTADO') {
+                if (data.status === 'aceptado') {
                     currentTripId = tripId;
                     
                     requestPanel.style.display = 'none'; 
@@ -1987,8 +2034,16 @@
                 if (!res.ok) return;
                 const data = await res.json();
                 const badge = document.querySelector('.achievement-badge');
-                if (badge && data.user && data.user.avgRating != null) {
-                    badge.textContent = `⭐ ${parseFloat(data.user.avgRating).toFixed(1)}`;
+                if (data.user && data.user.avgRating != null) {
+                    const parsedRating = parseFloat(data.user.avgRating).toFixed(1);
+                    if (badge) {
+                        badge.textContent = `⭐ ${parsedRating}`;
+                    }
+                    if (passengerAvgRatingValueEl) {
+                        passengerAvgRatingValueEl.textContent = parsedRating;
+                    }
+                } else if (passengerAvgRatingValueEl) {
+                    passengerAvgRatingValueEl.textContent = '--';
                 }
             } catch (err) {
                 console.error('Error cargando rating pasajero:', err);
@@ -2004,6 +2059,10 @@
             // Actualizar badge con la calificación real
             updatePassengerAchievementBadge();
             // ...existing code...
+            const resumeTripId = urlParams.get('resumeTrip');
+            if (resumeTripId) {
+                resumePassengerTrip(resumeTripId);
+            }
         });
     </script>
 </body>
