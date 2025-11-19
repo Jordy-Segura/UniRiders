@@ -82,7 +82,7 @@
     </section>
 
     <main class="admin-board">
-        <section class="admin-row">
+        <section class="admin-layout admin-layout--primary">
             <section class="admin-card admin-card--map">
                 <div class="admin-card__header">
                     <h2><i class="fas fa-map"></i> Conductores en vivo</h2>
@@ -103,93 +103,105 @@
             </section>
         </section>
 
-        <section class="admin-row admin-row--data">
+        <section class="admin-layout admin-layout--data">
             <section class="admin-card admin-card--stack">
-            <div class="admin-card__header">
-                <h2><i class="fas fa-users-gear"></i> Usuarios</h2>
-                <button id="refreshUsers" class="icon-btn" aria-label="Actualizar usuarios"><i class="fas fa-sync"></i></button>
-            </div>
-            <div class="admin-table__container">
-                <table class="admin-table" id="usersTable">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Correo</th>
-                            <th>Rol</th>
-                            <th>WhatsApp</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="5" class="empty-state">Sin usuarios cargados</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <form id="createUserForm" class="admin-form">
-                <h3>Crear usuario manualmente</h3>
-                <div class="form-row">
-                    <input type="text" id="newUserName" placeholder="Nombre completo" required>
-                    <input type="email" id="newUserEmail" placeholder="correo@espoch.edu.ec" required>
+                <div class="admin-card__header">
+                    <h2><i class="fas fa-users-gear"></i> Usuarios</h2>
+                    <button id="refreshUsers" class="icon-btn" aria-label="Actualizar usuarios"><i class="fas fa-sync"></i></button>
                 </div>
-                <div class="form-row">
-                    <input type="password" id="newUserPassword" placeholder="Contraseña temporal" required>
-                    <select id="newUserRole">
-                        <option value="pasajero">Pasajero</option>
-                        <option value="conductor">Conductor</option>
-                        <option value="administrador">Administrador</option>
-                    </select>
+                <div class="admin-split">
+                    <div class="admin-split__panel">
+                        <div class="admin-table__container">
+                            <table class="admin-table" id="usersTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Correo</th>
+                                        <th>Rol</th>
+                                        <th>WhatsApp</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="5" class="empty-state">Sin usuarios cargados</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="admin-split__panel admin-split__panel--form">
+                        <form id="createUserForm" class="admin-form">
+                            <h3>Crear usuario manualmente</h3>
+                            <div class="form-row">
+                                <input type="text" id="newUserName" placeholder="Nombre completo" required>
+                                <input type="email" id="newUserEmail" placeholder="correo@espoch.edu.ec" required>
+                            </div>
+                            <div class="form-row">
+                                <input type="password" id="newUserPassword" placeholder="Contraseña temporal" required>
+                                <select id="newUserRole">
+                                    <option value="pasajero">Pasajero</option>
+                                    <option value="conductor">Conductor</option>
+                                    <option value="administrador">Administrador</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <input type="tel" id="newUserPhone" placeholder="WhatsApp (opcional)">
+                                <select id="newUserPayment">
+                                    <option value="Efectivo">Pago en efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="submit-btn">
+                                <i class="fas fa-user-plus"></i> Crear usuario
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div class="form-row">
-                    <input type="tel" id="newUserPhone" placeholder="WhatsApp (opcional)">
-                    <select id="newUserPayment">
-                        <option value="Efectivo">Pago en efectivo</option>
-                        <option value="Transferencia">Transferencia</option>
-                    </select>
-                </div>
-                <button type="submit" class="submit-btn">
-                    <i class="fas fa-user-plus"></i> Crear usuario
-                </button>
-            </form>
-        </section>
+            </section>
 
-        <section class="admin-card admin-card--stack">
-            <div class="admin-card__header">
-                <h2><i class="fas fa-dollar-sign"></i> Tarifas</h2>
-                <button id="refreshPricing" class="icon-btn" aria-label="Actualizar tarifas"><i class="fas fa-sync"></i></button>
-            </div>
-            <div class="admin-table__container">
-                <table class="admin-table" id="pricingTable">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Descripción</th>
-                            <th>Precio</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="5" class="empty-state">Sin tarifas registradas</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <form id="createTariffForm" class="admin-form">
-                <h3>Nueva tarifa</h3>
-                <div class="form-row">
-                    <input type="text" id="tariffName" placeholder="Nombre" required>
-                    <input type="number" id="tariffPrice" placeholder="Precio" min="0" step="0.01" required>
+            <section class="admin-card admin-card--stack">
+                <div class="admin-card__header">
+                    <h2><i class="fas fa-dollar-sign"></i> Tarifas</h2>
+                    <button id="refreshPricing" class="icon-btn" aria-label="Actualizar tarifas"><i class="fas fa-sync"></i></button>
                 </div>
-                <textarea id="tariffDescription" placeholder="Descripción" rows="2"></textarea>
-                <label class="switch">
-                    <input type="checkbox" id="tariffActive" checked>
-                    <span class="slider"></span>
-                    <span class="switch-label">Tarifa activa</span>
-                </label>
-                <button type="submit" class="submit-btn">
-                    <i class="fas fa-plus-circle"></i> Guardar tarifa
-                </button>
-            </form>
-        </section>
+                <div class="admin-split">
+                    <div class="admin-split__panel">
+                        <div class="admin-table__container">
+                            <table class="admin-table" id="pricingTable">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Descripción</th>
+                                        <th>Precio</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="5" class="empty-state">Sin tarifas registradas</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="admin-split__panel admin-split__panel--form">
+                        <form id="createTariffForm" class="admin-form">
+                            <h3>Nueva tarifa</h3>
+                            <div class="form-row">
+                                <input type="text" id="tariffName" placeholder="Nombre" required>
+                                <input type="number" id="tariffPrice" placeholder="Precio" min="0" step="0.01" required>
+                            </div>
+                            <textarea id="tariffDescription" placeholder="Descripción" rows="2"></textarea>
+                            <label class="switch">
+                                <input type="checkbox" id="tariffActive" checked>
+                                <span class="slider"></span>
+                                <span class="switch-label">Tarifa activa</span>
+                            </label>
+                            <button type="submit" class="submit-btn">
+                                <i class="fas fa-plus-circle"></i> Guardar tarifa
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
         </section>
     </main>
 
