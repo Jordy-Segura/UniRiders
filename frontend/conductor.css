@@ -73,6 +73,29 @@ body {
     box-shadow: 0 0 10px var(--color-verde-espoch), 0 0 20px var(--color-verde-espoch);
 }
 
+.live-clock-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85em;
+    padding: 4px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    margin-top: 6px;
+}
+
+.stat-item__value {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.stat-item__value strong {
+    font-size: 1.1em;
+}
+
 .offers-panel {
     background: rgba(0, 0, 0, 0.2);
     padding: 20px;

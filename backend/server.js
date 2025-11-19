@@ -12,6 +12,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { sendRecoveryMail, sendVerificationMail, sendAdminLoginMail } = require('./mailer');
+const https = require('https');
 
 const app = express();
 app.use(cors());
@@ -43,6 +44,8 @@ const appStatistics = {
 const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_LOWER = DEFAULT_ADMIN_EMAIL.toLowerCase();
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
+const CALLMEBOT_API_KEY = process.env.CALLMEBOT_API_KEY || process.env.WHATSAPP_ALERT_API_KEY || null;
+const DRIVER_LOCATION_TTL_MS = 5 * 60 * 1000;
 
 const PUBLIC_REGISTRATION_ROLES = ['pasajero', 'conductor'];
 const ADMIN_MANAGEABLE_ROLES = ['pasajero', 'conductor', 'administrador'];
@@ -59,6 +62,52 @@ function sanitizePhoneNumber(phone) {
     if (!phone) return null;
     const digits = String(phone).replace(/\D/g, "");
     return digits.length ? digits : null;
+}
+
+function isDriverBusy(email) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) return false;
+
+    return Object.values(globalActiveTrips).some(trip => {
+        if (!trip) return false;
+        const driverEmail = normalizeEmail(trip.driverEmail || trip.conductor_email || trip.driver);
+        const status = (trip.status || trip.estado || '').toLowerCase();
+        if (!driverEmail || driverEmail !== normalizedEmail) return false;
+        return status && status !== 'finalizado' && status !== 'cancelado';
+    });
+}
+
+function fireAndForgetHttpsGet(url) {
+    return new Promise(resolve => {
+        const request = https.get(url, (response) => {
+            response.on('data', () => {});
+            response.on('end', () => resolve({ statusCode: response.statusCode }));
+        });
+
+        request.on('error', (error) => {
+            resolve({ error: error.message });
+        });
+
+        request.end();
+    });
+}
+
+async function notifyAdminsViaWhatsApp(contacts = [], alertMessage = '') {
+    if (!CALLMEBOT_API_KEY) {
+        return [];
+    }
+
+    const requests = contacts
+        .map(contact => {
+            const normalizedPhone = sanitizePhoneNumber(contact.phone || contact.normalizedPhone);
+            if (!normalizedPhone) return null;
+            const encodedMessage = encodeURIComponent(alertMessage);
+            return `https://api.callmebot.com/whatsapp.php?phone=${normalizedPhone}&text=${encodedMessage}&apikey=${CALLMEBOT_API_KEY}`;
+        })
+        .filter(Boolean)
+        .map(url => fireAndForgetHttpsGet(url));
+
+    return Promise.all(requests);
 }
 
 function requireAdmin(req, res, next) {
@@ -87,12 +136,11 @@ async function ensureAdminInfrastructure() {
             BEGIN
                 CREATE TABLE Tarifas (
                     id INT IDENTITY(1,1) PRIMARY KEY,
-                    nombre NVARCHAR(120) NOT NULL,
+                    nombre NVARCHAR(100) NOT NULL,
                     descripcion NVARCHAR(255) NULL,
                     precio DECIMAL(10,2) NOT NULL,
                     activo BIT NOT NULL DEFAULT 1,
-                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE(),
-                    creado_por NVARCHAR(150) NULL
+                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE()
                 );
             END
         `);
@@ -111,6 +159,21 @@ async function ensureAdminInfrastructure() {
                     fecha DATETIME NOT NULL DEFAULT GETDATE(),
                     atendido_por NVARCHAR(150) NULL
                 );
+            END
+        `);
+
+        await pool.request().query(`
+            IF OBJECT_ID('dbo.Vehiculos', 'U') IS NULL
+            BEGIN
+                CREATE TABLE Vehiculos (
+                    id_vehiculo INT IDENTITY(1,1) PRIMARY KEY,
+                    email_conductor NVARCHAR(150) NOT NULL,
+                    marca NVARCHAR(100) NOT NULL,
+                    modelo NVARCHAR(100) NOT NULL
+                );
+                ALTER TABLE Vehiculos WITH CHECK
+                ADD CONSTRAINT FK_Vehiculos_Usuarios FOREIGN KEY (email_conductor)
+                REFERENCES Usuarios(email);
             END
         `);
 
@@ -184,32 +247,32 @@ async function updateRealTimeStats() {
         
         // Contar viajes activos
         const activeTripsResult = await pool.request()
-            .query("SELECT COUNT(*) as active_trips FROM Viajes WHERE estado = 'ACEPTADO'");
+            .query("SELECT COUNT(*) as active_trips FROM Viajes WHERE estado = 'aceptado'");
         
         const activeTrips = activeTripsResult.recordset[0]?.active_trips || 0;
         
         // Contar viajes completados hoy
         const completedTodayResult = await pool.request()
-            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'COMPLETADO' AND CAST(fecha_finalizacion AS DATE) = CAST(GETDATE() AS DATE)");
+            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'finalizado' AND CAST(fecha_finalizacion AS DATE) = CAST(GETDATE() AS DATE)");
         
         const completedToday = completedTodayResult.recordset[0]?.completed_today || 0;
         
         // Actualizar tabla de estadísticas
         await pool.request()
             .query(`
-                UPDATE EstadisticasApp SET 
+                UPDATE EstadisticasApp SET
                 usuarios_activos = ${activeUsers},
                 viajes_activos = ${activeTrips},
-                viajes_completados = (SELECT COUNT(*) FROM Viajes WHERE estado = 'COMPLETADO'),
-                ingresos_totales = (SELECT ISNULL(SUM(costo), 0) FROM Viajes WHERE estado = 'COMPLETADO'),
-                ultima_actualizacion = GETDATE()
+                viajes_completados = (SELECT COUNT(*) FROM Viajes WHERE estado = 'finalizado'),
+                ingresos_totales = (SELECT dbo.fn_TotalIngresos()),
+                fecha_reporte = CAST(GETDATE() AS DATE)
             `);
-            
-        return { activeUsers, activeTrips, completedToday };
-        
+
+        return { activeUsers, activeTrips, completedToday, syncedAt: new Date().toISOString() };
+
     } catch (err) {
         console.log('Error actualizando estadísticas:', err);
-        return { activeUsers: 5, activeTrips: 0, completedToday: 0 };
+        return { activeUsers: 5, activeTrips: 0, completedToday: 0, syncedAt: new Date().toISOString() };
     }
 }
 
@@ -223,30 +286,21 @@ async function getTripHistory(email, role) {
 
     try {
         const pool = await poolPromise;
-        let query;
-
-        if (role === 'conductor') {
-            query = `
-                SELECT TOP 10 id_viaje, pasajero_email, origen, destino, estado, costo,
-                       fecha_solicitud, fecha_aceptacion, fecha_finalizacion, calificacion_pasajero
-                FROM Viajes
-                WHERE LOWER(conductor_email) = @email
-                ORDER BY fecha_solicitud DESC
-            `;
-        } else {
-            query = `
-                SELECT TOP 10 id_viaje, conductor_email, origen, destino, estado, costo,
-                       fecha_solicitud, fecha_aceptacion, fecha_finalizacion, calificacion_conductor
-                FROM Viajes
-                WHERE LOWER(pasajero_email) = @email
-                ORDER BY fecha_solicitud DESC
-            `;
-        }
+        const filterColumn = role === 'conductor' ? 'v.conductor_email' : 'v.pasajero_email';
+        const historyQuery = `
+            SELECT TOP 10 d.id_viaje, d.pasajero_email, d.conductor_email, d.origen, d.destino,
+                   d.estado, d.costo, d.metodo_pago, d.fecha_solicitud, d.fecha_aceptacion,
+                   d.fecha_finalizacion, d.pasajero, d.conductor, d.tarifa
+            FROM vw_Viajes_Detalle d
+            INNER JOIN Viajes v ON v.id_viaje = d.id_viaje
+            WHERE LOWER(${filterColumn}) = @email
+            ORDER BY d.fecha_solicitud DESC
+        `;
 
         const result = await pool.request()
             .input("email", sql.NVarChar, normalizedEmail)
-            .query(query);
-            
+            .query(historyQuery);
+
         return result.recordset;
     } catch (err) {
         console.log('Error obteniendo historial:', err);
@@ -268,7 +322,7 @@ async function initializeStatistics() {
         // Intentar obtener estadísticas de viajes si las tablas existen
         try {
             const tripsResult = await pool.request()
-                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE estado = 'COMPLETADO'");
+                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE estado = 'finalizado'");
             appStatistics.completedTrips = tripsResult.recordset[0].completedTrips || 0;
         } catch (err) {
             // Si no existe la tabla Viajes, usar valores por defecto
@@ -277,7 +331,7 @@ async function initializeStatistics() {
         
         try {
             const earningsResult = await pool.request()
-                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE estado = 'COMPLETADO'");
+                .query("SELECT dbo.fn_TotalIngresos() as totalEarnings");
             appStatistics.totalEarnings = earningsResult.recordset[0].totalEarnings || 0;
         } catch (err) {
             // Si no existe la columna costo, calcular basado en viajes completados
@@ -303,6 +357,57 @@ function parseCoordinateString(coordString) {
         lat: parseFloat(matches[0]),
         lon: parseFloat(matches[1])
     };
+}
+
+function formatTripTimestamp(dateValue) {
+    const formatOptions = { hour: '2-digit', minute: '2-digit' };
+    if (!dateValue) {
+        return new Date().toLocaleTimeString('es-EC', formatOptions);
+    }
+
+    try {
+        return new Date(dateValue).toLocaleTimeString('es-EC', formatOptions);
+    } catch (err) {
+        return new Date().toLocaleTimeString('es-EC', formatOptions);
+    }
+}
+
+function mapDbTripToOffer(row = {}) {
+    const fallbackTrip = globalTripOffers.find(t => t.id === row.id_viaje) || {};
+
+    return {
+        id: row.id_viaje ?? fallbackTrip.id,
+        passenger: row.pasajero || fallbackTrip.passenger || row.pasajero_email || fallbackTrip.passengerEmail || 'Pasajero',
+        passengerEmail: row.pasajero_email || fallbackTrip.passengerEmail || null,
+        origin: row.origen || fallbackTrip.origin || 'Origen no disponible',
+        destination: row.destino || fallbackTrip.destination || 'Destino no disponible',
+        payment: row.metodo_pago || fallbackTrip.payment || 'Efectivo',
+        timestamp: row.fecha_solicitud ? formatTripTimestamp(row.fecha_solicitud) : (fallbackTrip.timestamp || formatTripTimestamp()),
+        originCoords: fallbackTrip.originCoords || 'Lat: -1.65, Lon: -78.68',
+        destinationCoords: fallbackTrip.destinationCoords || 'Lat: -1.66, Lon: -78.69',
+        status: row.estado || fallbackTrip.status || 'pendiente',
+        tariffId: row.id_tarifa || fallbackTrip.tariffId || null
+    };
+}
+
+async function getDefaultTariffId() {
+    try {
+        const pool = await poolPromise;
+        const tariffResult = await pool.request().query(`
+            SELECT TOP 1 id
+            FROM Tarifas
+            WHERE activo = 1
+            ORDER BY precio ASC, id ASC
+        `);
+
+        if (tariffResult.recordset.length) {
+            return tariffResult.recordset[0].id;
+        }
+    } catch (err) {
+        console.log('No se pudo obtener la tarifa por defecto:', err);
+    }
+
+    return null;
 }
 
 // =========================================================
@@ -359,7 +464,6 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
             return res.status(400).json({ message: "El correo ya está registrado" });
         }
 
-        const targetRole = isMasterAdmin ? 'administrador' : role;
         const verificationCode = generateVerificationCode();
         verificationCodes.set(normalizedEmail, {
             code: verificationCode,
@@ -422,8 +526,12 @@ app.post("/api/verify-registration", async (req, res) => {
             .input("email", sql.NVarChar, normalizedEmail)
             .input("password", sql.NVarChar, hashedPassword)
             .input("rol", sql.NVarChar, role)
+            .execute('sp_Seguro_RegistrarUsuario');
+
+        await pool.request()
+            .input("email", sql.NVarChar, normalizedEmail)
             .input("telefono", sql.NVarChar, phone || null)
-            .query(`INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp) VALUES (@nombre, @email, @password, @rol, 'Efectivo', @telefono)`);
+            .query(`UPDATE Usuarios SET metodo_pago_pref = 'Efectivo', telefono_whatsapp = @telefono WHERE LOWER(email) = @email`);
 
         // Actualizar estadísticas
         appStatistics.totalUsers++;
@@ -518,6 +626,56 @@ app.post("/api/admin/request-code", async (req, res) => {
     } catch (err) {
         verificationCodes.delete(normalizedEmail);
         res.status(500).json({ message: "Error del servidor" });
+    }
+});
+
+app.post("/api/admin/login-key", requireAdmin, async (req, res) => {
+    const adminEmailHeader = req.headers['user-email'];
+    const normalizedAdminEmail = normalizeEmail(adminEmailHeader);
+    const { currentPassword, newPassword } = req.body || {};
+
+    if (!normalizedAdminEmail) {
+        return res.status(400).json({ message: "Correo de administrador inválido" });
+    }
+
+    if (!newPassword || newPassword.length < 8) {
+        return res.status(400).json({ message: "La nueva clave debe tener al menos 8 caracteres" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const adminResult = await pool.request()
+            .input("email", sql.NVarChar, normalizedAdminEmail)
+            .query("SELECT password FROM Usuarios WHERE LOWER(email) = @email AND rol = 'administrador'");
+
+        if (adminResult.recordset.length === 0) {
+            return res.status(404).json({ message: "No existe un administrador con este correo" });
+        }
+
+        const storedPassword = adminResult.recordset[0].password || '';
+        const passwordAlreadySet = Boolean(storedPassword);
+        const isDefaultAdmin = normalizedAdminEmail === DEFAULT_ADMIN_EMAIL_LOWER;
+
+        if (!isDefaultAdmin && passwordAlreadySet) {
+            if (!currentPassword) {
+                return res.status(400).json({ message: "Debes ingresar tu clave actual" });
+            }
+
+            const matches = await bcrypt.compare(currentPassword, storedPassword);
+            if (!matches) {
+                return res.status(401).json({ message: "La clave actual no coincide" });
+            }
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await pool.request()
+            .input("email", sql.NVarChar, normalizedAdminEmail)
+            .input("password", sql.NVarChar, hashedPassword)
+            .query("UPDATE Usuarios SET password = @password WHERE LOWER(email) = @email");
+
+        res.json({ message: "Clave actualizada. Ya puedes ingresar con usuario y contraseña." });
+    } catch (err) {
+        res.status(500).json({ message: "No se pudo actualizar la clave" });
     }
 });
 
@@ -847,7 +1005,6 @@ app.get("/api/admin/pricing", requireAdmin, async (req, res) => {
 
 app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
     const { nombre, descripcion, precio, activo = true } = req.body;
-    const adminEmail = req.headers['user-email'];
 
     if (!nombre || precio === undefined) {
         return res.status(400).json({ message: "Nombre y precio son obligatorios" });
@@ -860,10 +1017,9 @@ app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
             .input("descripcion", sql.NVarChar, descripcion || null)
             .input("precio", sql.Decimal(10,2), parseFloat(precio))
             .input("activo", sql.Bit, activo ? 1 : 0)
-            .input("creado_por", sql.NVarChar, adminEmail || null)
             .query(`
-                INSERT INTO Tarifas (nombre, descripcion, precio, activo, creado_por)
-                VALUES (@nombre, @descripcion, @precio, @activo, @creado_por)
+                INSERT INTO Tarifas (nombre, descripcion, precio, activo)
+                VALUES (@nombre, @descripcion, @precio, @activo)
             `);
 
         res.status(201).json({ message: "Tarifa creada" });
@@ -990,9 +1146,14 @@ app.post("/api/admin/emergencies/:id/resolve", requireAdmin, async (req, res) =>
 
 app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
     try {
-        const driverEmails = Array.from(driverLocations.keys());
-        const response = [];
+        const now = Date.now();
+        const freshEntries = Array.from(driverLocations.entries()).filter(([_, location]) => {
+            if (!location) return false;
+            return now - (location.timestamp || 0) <= DRIVER_LOCATION_TTL_MS;
+        });
 
+        const driverEmails = freshEntries.map(([email]) => email);
+        const response = [];
         let namesMap = new Map();
 
         if (driverEmails.length > 0) {
@@ -1007,23 +1168,13 @@ app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
             result.recordset.forEach(row => namesMap.set(row.email, row.nombre));
         }
 
-        driverEmails.forEach(email => {
-            const location = driverLocations.get(email);
-            const isBusy = Object.values(globalActiveTrips).some(trip => {
-                if (!trip) return false;
-                const driverEmail = trip.driverEmail || trip.conductor_email || trip.driver;
-                const status = trip.status || trip.estado;
-                if (!driverEmail) return false;
-                if (driverEmail !== email) return false;
-                return status && status !== 'FINALIZADO';
-            });
-
+        freshEntries.forEach(([email, location]) => {
             response.push({
                 email,
                 name: namesMap.get(email) || email,
                 lat: location.lat,
                 lon: location.lon,
-                available: !isBusy,
+                available: !isDriverBusy(email),
                 lastUpdate: location.timestamp
             });
         });
@@ -1032,6 +1183,35 @@ app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: "Error al obtener ubicaciones" });
     }
+});
+
+app.get("/api/drivers/active", (req, res) => {
+    const now = Date.now();
+    const drivers = [];
+
+    driverLocations.forEach((location, email) => {
+        if (!location) return;
+        if (now - (location.timestamp || 0) > DRIVER_LOCATION_TTL_MS) return;
+
+        drivers.push({
+            email,
+            lat: location.lat,
+            lon: location.lon,
+            available: !isDriverBusy(email),
+            lastUpdate: location.timestamp
+        });
+    });
+
+    const available = drivers.filter(driver => driver.available).length;
+    const busy = drivers.length - available;
+
+    res.json({
+        count: drivers.length,
+        available,
+        busy,
+        lastUpdated: new Date(now).toISOString(),
+        drivers
+    });
 });
 
 app.post("/api/resend-verification", validateEspochEmail, async (req, res) => {
@@ -1094,13 +1274,21 @@ app.get("/api/stats/overview", async (req, res) => {
             .query("SELECT COUNT(*) as total_users FROM Usuarios");
         
         const totalUsers = totalUsersResult.recordset[0]?.total_users || 0;
-        
+
+        const earningsResult = await pool.request()
+            .query("SELECT dbo.fn_TotalIngresos() as total_earnings");
+
+        const completedResult = await pool.request()
+            .query("SELECT COUNT(*) as completed_trips FROM Viajes WHERE estado = 'finalizado'");
+
         res.json({
             totalUsers: totalUsers,
             activeTrips: realStats.activeTrips,
-            completedTrips: realStats.completedToday,
+            completedTrips: completedResult.recordset[0]?.completed_trips || realStats.completedToday,
             activeUsers: realStats.activeUsers,
-            totalEarnings: 0 // Se calculará automáticamente
+            totalEarnings: earningsResult.recordset[0]?.total_earnings || 0,
+            completedToday: realStats.completedToday,
+            syncedAt: realStats.syncedAt
         });
     } catch (err) {
         res.json({
@@ -1108,7 +1296,27 @@ app.get("/api/stats/overview", async (req, res) => {
             activeTrips: 0,
             completedTrips: 25,
             activeUsers: 5,
-            totalEarnings: 87.50
+            totalEarnings: 87.50,
+            completedToday: 0,
+            syncedAt: new Date().toISOString()
+        });
+    }
+});
+
+app.get("/api/system/time", async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT SYSDATETIMEOFFSET() AS serverTime");
+        const serverTime = result.recordset[0]?.serverTime || new Date().toISOString();
+        res.json({
+            serverTime,
+            epochMs: new Date(serverTime).getTime()
+        });
+    } catch (err) {
+        const fallback = new Date();
+        res.json({
+            serverTime: fallback.toISOString(),
+            epochMs: fallback.getTime()
         });
     }
 });
@@ -1191,18 +1399,39 @@ app.post("/api/chat/:tripId/save", async (req, res) => {
 // RUTAS DE VIAJES MEJORADAS
 // =========================================================
 
-app.get("/api/trips/offers", (req, res) => {
-    res.json(globalTripOffers);
+app.get("/api/trips/offers", async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                   v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
+            FROM Viajes v
+            INNER JOIN Usuarios u ON v.pasajero_email = u.email
+            WHERE v.estado = 'pendiente'
+            ORDER BY v.fecha_solicitud DESC
+        `);
+
+        const offers = result.recordset.map(mapDbTripToOffer);
+        return res.json(offers);
+    } catch (err) {
+        console.log('No se pudieron obtener las ofertas desde la base de datos, usando memoria:', err.message);
+        return res.json(globalTripOffers);
+    }
 });
 
 // Ruta para crear viaje en base de datos
 app.post("/api/trips/request", async (req, res) => {
     const { passengerName, origin, destination, paymentMethod, passengerEmail } = req.body;
-    
+
     if (!passengerName || !origin || !destination) {
         return res.status(400).json({ message: "Datos incompletos" });
     }
-    
+
+    const tarifaId = await getDefaultTariffId();
+    if (!tarifaId) {
+        return res.status(500).json({ message: "No existe una tarifa activa para registrar el viaje" });
+    }
+
     const newTrip = {
         id: Date.now(),
         passenger: passengerName,
@@ -1213,26 +1442,30 @@ app.post("/api/trips/request", async (req, res) => {
         timestamp: new Date().toLocaleTimeString(),
         originCoords: `Lat: -1.65, Lon: -78.68`,
         destinationCoords: `Lat: -1.66, Lon: -78.69`,
-        status: 'PENDIENTE'
+        status: 'pendiente',
+        tariffId: tarifaId
     };
-    
+
     // Guardar en base de datos
     try {
         const pool = await poolPromise;
         const result = await pool.request()
-            .input("passengerEmail", sql.NVarChar, passengerEmail)
-            .input("origin", sql.NVarChar, origin)
-            .input("destination", sql.NVarChar, destination)
-            .input("paymentMethod", sql.NVarChar, paymentMethod || 'Efectivo')
-            .query(`
-                INSERT INTO Viajes (pasajero_email, origen, destino, metodo_pago, estado) 
-                OUTPUT INSERTED.id_viaje
-                VALUES (@passengerEmail, @origin, @destination, @paymentMethod, 'PENDIENTE')
-            `);
-            
-        newTrip.id = result.recordset[0].id_viaje;
+            .input("pasajero_email", sql.NVarChar, passengerEmail)
+            .input("conductor_email", sql.NVarChar, null)
+            .input("id_tarifa", sql.Int, tarifaId)
+            .input("origen", sql.NVarChar, origin)
+            .input("destino", sql.NVarChar, destination)
+            .input("metodo_pago", sql.NVarChar, paymentMethod || 'Efectivo')
+            .execute('sp_RegistrarViaje');
+
+        if (result.recordset?.length) {
+            newTrip.id = result.recordset[0].id_viaje;
+        } else {
+            return res.status(500).json({ message: "No se pudo registrar el viaje" });
+        }
     } catch (dbErr) {
         console.log('Error guardando viaje en BD:', dbErr);
+        return res.status(500).json({ message: "No se pudo registrar el viaje" });
     }
     
     globalTripOffers.push(newTrip);
@@ -1248,23 +1481,44 @@ app.post("/api/trips/request", async (req, res) => {
 app.post("/api/trips/accept", async (req, res) => {
     try {
         const { tripId, driverName, driverEmail } = req.body;
-        
+
         const numericTripId = parseInt(tripId);
-        const tripIndex = globalTripOffers.findIndex(trip => trip.id === numericTripId);
-        
-        if (tripIndex === -1) {
-            return res.status(404).json({ message: "Viaje no encontrado" });
+        if (Number.isNaN(numericTripId)) {
+            return res.status(400).json({ message: "Identificador de viaje inválido" });
         }
 
-        const trip = globalTripOffers.splice(tripIndex, 1)[0];
-        
+        const pool = await poolPromise;
+
+        let trip;
+        const tripIndex = globalTripOffers.findIndex(trip => trip.id === numericTripId);
+
+        if (tripIndex !== -1) {
+            trip = globalTripOffers.splice(tripIndex, 1)[0];
+        } else {
+            const dbTripResult = await pool.request()
+                .input("tripId", sql.Int, numericTripId)
+                .query(`
+                    SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                           v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
+                    FROM Viajes v
+                    INNER JOIN Usuarios u ON v.pasajero_email = u.email
+                    WHERE v.id_viaje = @tripId AND v.estado = 'pendiente'
+                `);
+
+            if (!dbTripResult.recordset.length) {
+                return res.status(404).json({ message: "Viaje no encontrado" });
+            }
+
+            trip = mapDbTripToOffer(dbTripResult.recordset[0]);
+        }
+
         const fallbackPassengerLocation = parseCoordinateString(trip.originCoords);
 
         globalActiveTrips[numericTripId] = {
             ...trip,
             driver: driverName,
             driverEmail: driverEmail,
-            status: 'ACEPTADO',
+            status: 'aceptado',
             startTime: new Date(),
             driverLocation: { lat: -1.65, lon: -78.68 },
             passengerLocation: fallbackPassengerLocation || null
@@ -1272,17 +1526,17 @@ app.post("/api/trips/accept", async (req, res) => {
 
         // Actualizar en base de datos
         try {
-            const pool = await poolPromise;
             await pool.request()
                 .input("tripId", sql.Int, numericTripId)
                 .input("driverEmail", sql.NVarChar, driverEmail)
                 .query(`
-                    UPDATE Viajes SET 
-                    conductor_email = @driverEmail,
-                    estado = 'ACEPTADO',
-                    fecha_aceptacion = GETDATE()
+                    UPDATE Viajes SET conductor_email = @driverEmail
                     WHERE id_viaje = @tripId
                 `);
+
+            await pool.request()
+                .input("id_viaje", sql.Int, numericTripId)
+                .execute('sp_AceptarViaje');
         } catch (dbErr) {
             console.log('Error actualizando viaje en BD:', dbErr);
         }
@@ -1299,14 +1553,14 @@ app.post("/api/trips/accept", async (req, res) => {
             sender: "Sistema UniRiders",
             message: `🚗 ${driverName} ha aceptado tu viaje. Está en camino hacia ti.`,
             timestamp: new Date().toISOString(),
-            displayTime: new Date().toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            displayTime: new Date().toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit'
             }),
             type: "system"
         });
 
-        res.json({ 
+        res.json({
             message: "Viaje aceptado exitosamente",
             trip: globalActiveTrips[numericTripId]
         });
@@ -1328,7 +1582,7 @@ app.get("/api/trips/:id/status", (req, res) => {
     
     const pendingTrip = globalTripOffers.find(t => t.id === tripId);
     if (pendingTrip) {
-        return res.json({ status: 'PENDIENTE', driver: null });
+        return res.json({ status: 'pendiente', driver: null });
     }
     
     return res.status(404).json({ message: "Viaje no encontrado" });
@@ -1377,7 +1631,7 @@ app.post("/api/trips/:id/resume", async (req, res) => {
         const trip = result.recordset[0];
         
         // Solo permitir reanudar viajes ACTIVOS
-        if (trip.estado !== 'ACEPTADO') {
+        if (trip.estado !== 'aceptado') {
             return res.status(400).json({ message: "Solo se pueden reanudar viajes activos" });
         }
 
@@ -1405,7 +1659,7 @@ app.post("/api/trips/:id/resume", async (req, res) => {
                     origin: tripData.origen,
                     destination: tripData.destino,
                     payment: tripData.metodo_pago,
-                    status: 'ACEPTADO',
+                    status: 'aceptado',
                     originCoords: `Lat: -1.65, Lon: -78.68`,
                     destinationCoords: `Lat: -1.66, Lon: -78.69`
                 };
@@ -1458,16 +1712,13 @@ app.post("/api/trips/complete", async (req, res) => {
         try {
             const pool = await poolPromise;
             await pool.request()
-                .input("tripId", sql.Int, numericTripId)
-                .input("driverEmail", sql.NVarChar, driverEmail)
-                .input("cost", sql.Decimal(10,2), tripCost)
-                .query(`
-                    UPDATE Viajes SET 
-                    estado = 'COMPLETADO', 
-                    fecha_finalizacion = GETDATE(),
-                    costo = @cost
-                    WHERE id_viaje = @tripId AND conductor_email = @driverEmail
-                `);
+                .input("id_viaje", sql.Int, trip.id)
+                .input("costo", sql.Decimal(10,2), tripCost)
+                .input("calif_pasajero", sql.Decimal(5,2), null)
+                .input("calif_conductor", sql.Decimal(5,2), null)
+                .input("coment_p", sql.NVarChar, null)
+                .input("coment_c", sql.NVarChar, null)
+                .execute('sp_FinalizarViaje');
         } catch (dbErr) {
             console.log('Error guardando viaje en BD:', dbErr);
         }
@@ -1508,7 +1759,7 @@ app.post("/api/trips/complete", async (req, res) => {
         }
 
         // Cambiar estado del viaje
-        globalActiveTrips[numericTripId].status = 'FINALIZADO';
+        globalActiveTrips[numericTripId].status = 'finalizado';
         globalActiveTrips[numericTripId].endTime = new Date();
         globalActiveTrips[numericTripId].cost = tripCost;
 
@@ -1780,7 +2031,7 @@ app.get("/api/stats/driver/:email", async (req, res) => {
         try {
             const tripsResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'COMPLETADO'");
+                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'finalizado'");
             completedTrips = tripsResult.recordset[0].completedTrips || 0;
         } catch (err) {
             completedTrips = Math.floor(Math.random() * 20) + 10 + activeTrips;
@@ -1791,7 +2042,7 @@ app.get("/api/stats/driver/:email", async (req, res) => {
         try {
             const earningsResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'COMPLETADO'");
+                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'finalizado'");
             totalEarnings = parseFloat(earningsResult.recordset[0].totalEarnings || 0).toFixed(2);
         } catch (err) {
             totalEarnings = (completedTrips * 3.5).toFixed(2);
@@ -1863,26 +2114,27 @@ app.get("/api/profile/:email", async (req, res) => {
         const userData = userResult.recordset[0];
         
         // Calcular calificación promedio según el rol
-        const ratingQuery = userData.rol === 'conductor'
-            ? `SELECT AVG(CAST(calificacion_conductor AS FLOAT)) as avgRating
-                FROM Viajes
-                WHERE LOWER(conductor_email) = @email AND calificacion_conductor IS NOT NULL`
-            : `SELECT AVG(CAST(calificacion_pasajero AS FLOAT)) as avgRating
-                FROM Viajes
-                WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL`;
+        let ratingValue = 0;
+        if (userData.rol === 'conductor') {
+            const ratingResult = await pool.request()
+                .input("email", sql.NVarChar, normalizedEmail)
+                .query("SELECT dbo.fn_PromedioConductor(@email) as avgRating");
+            ratingValue = ratingResult.recordset[0]?.avgRating || 0;
+        } else {
+            const ratingResult = await pool.request()
+                .input("email", sql.NVarChar, normalizedEmail)
+                .query(`SELECT AVG(CAST(calificacion_pasajero AS FLOAT)) as avgRating FROM Viajes WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL`);
+            ratingValue = ratingResult.recordset[0]?.avgRating || 0;
+        }
 
-        const ratingResult = await pool.request()
-            .input("email", sql.NVarChar, normalizedEmail)
-            .query(ratingQuery);
-            
-        userData.avgRating = parseFloat(ratingResult.recordset[0]?.avgRating || 0).toFixed(1);
+        userData.avgRating = parseFloat(ratingValue || 0).toFixed(1);
         
         let vehicleData = {};
         if (userData.rol === 'conductor') {
             try {
                 const vehicleResult = await pool.request()
                     .input("email", sql.NVarChar, normalizedEmail)
-                    .query("SELECT marca, modelo, placa FROM Vehiculos WHERE LOWER(email_conductor) = @email");
+                    .query("SELECT marca, modelo FROM Vehiculos WHERE LOWER(email_conductor) = @email");
                 
                 if (vehicleResult.recordset.length > 0) {
                     vehicleData = vehicleResult.recordset[0];
@@ -1900,7 +2152,7 @@ app.get("/api/profile/:email", async (req, res) => {
 });
 
 app.post("/api/profile/update", async (req, res) => {
-    const { email, name, password, marca, modelo, placa, roleSwitch, paymentMethod, telefono } = req.body;
+    const { email, name, password, marca, modelo, roleSwitch, paymentMethod, telefono } = req.body;
     const requesterRole = req.headers['user-role'];
     const normalizedEmail = normalizeEmail(email);
 
@@ -1963,6 +2215,11 @@ app.post("/api/profile/update", async (req, res) => {
 
         await request.query(updateQuery);
 
+        if (desiredRole === 'conductor' && (!marca || !modelo)) {
+            await transaction.rollback();
+            return res.status(400).json({ message: "Los conductores deben registrar marca y modelo del vehículo" });
+        }
+
         if (desiredRole === 'conductor') {
             try {
                 const checkVehicle = await transaction.request()
@@ -1973,16 +2230,14 @@ app.post("/api/profile/update", async (req, res) => {
                     await transaction.request()
                         .input("marca", sql.NVarChar, marca)
                         .input("modelo", sql.NVarChar, modelo)
-                        .input("placa", sql.NVarChar, placa)
                         .input("email", sql.NVarChar, normalizedEmail)
-                        .query(`UPDATE Vehiculos SET marca = @marca, modelo = @modelo, placa = @placa WHERE LOWER(email_conductor) = @email`);
+                        .query(`UPDATE Vehiculos SET marca = @marca, modelo = @modelo WHERE LOWER(email_conductor) = @email`);
                 } else {
                     await transaction.request()
                         .input("marca", sql.NVarChar, marca)
                         .input("modelo", sql.NVarChar, modelo)
-                        .input("placa", sql.NVarChar, placa)
                         .input("email", sql.NVarChar, normalizedEmail)
-                        .query(`INSERT INTO Vehiculos (email_conductor, marca, modelo, placa) VALUES (@email, @marca, @modelo, @placa)`);
+                        .query(`INSERT INTO Vehiculos (email_conductor, marca, modelo) VALUES (@email, @marca, @modelo)`);
                 }
             } catch (err) {
                 // Si no existe la tabla Vehiculos, no hacer nada
@@ -2180,14 +2435,32 @@ app.post("/api/emergency/alert", async (req, res) => {
                 name: contact.nombre,
                 email: contact.email,
                 phone: contact.telefono_whatsapp,
+                normalizedPhone,
                 whatsappLink
             };
         });
 
+        const alertSummaryLines = [
+            'Alerta de emergencia desde UniRiders',
+            `Usuario: ${userEmail || 'desconocido'}`
+        ];
+
+        if (message) {
+            alertSummaryLines.push(`Detalle: ${message}`);
+        }
+
+        if (lat !== null && lon !== null) {
+            alertSummaryLines.push(`Ubicación: https://maps.google.com/?q=${lat},${lon}`);
+        }
+
+        const whatsappDeliveries = await notifyAdminsViaWhatsApp(contacts, alertSummaryLines.join('\n'));
+
         res.json({
             success: true,
             message: "Alerta de emergencia enviada",
-            contacts
+            contacts,
+            whatsappDeliveries,
+            autoWhatsApp: whatsappDeliveries.length > 0 && CALLMEBOT_API_KEY
         });
     } catch (err) {
         res.status(500).json({ message: "No se pudo registrar la emergencia" });

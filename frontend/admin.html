@@ -23,11 +23,27 @@
                 <h2><i class="fas fa-user-shield"></i> Administrador</h2>
                 <p id="adminName">-</p>
                 <p id="adminEmail" class="admin-contact__email">-</p>
-                <form id="adminContactForm">
+                <form id="adminContactForm" class="admin-contact-form">
                     <label for="adminContactPhone">Número WhatsApp</label>
                     <input type="tel" id="adminContactPhone" placeholder="Ej: +593987654321" required>
                     <button type="submit" class="submit-btn small-btn">
                         <i class="fas fa-save"></i> Guardar contacto
+                    </button>
+                </form>
+                <div class="admin-card__divider"></div>
+                <form id="adminKeyForm" class="admin-key-form">
+                    <label for="adminNewKey">Configurar clave de acceso</label>
+                    <p class="admin-key-form__hint" id="adminKeyHint">El administrador maestro puede crear su contraseña y usar el inicio de sesión tradicional.</p>
+                    <div class="key-input-row">
+                        <div class="key-input-row__item">
+                            <input type="password" id="adminNewKey" placeholder="Nueva clave segura" minlength="8" required>
+                        </div>
+                        <div class="key-input-row__item" id="adminCurrentKeyWrapper">
+                            <input type="password" id="adminCurrentKey" placeholder="Clave actual (si ya tienes una)">
+                        </div>
+                    </div>
+                    <button type="submit" class="submit-btn small-btn">
+                        <i class="fas fa-key"></i> Guardar clave
                     </button>
                 </form>
             </div>
@@ -37,17 +53,58 @@
         </div>
     </header>
 
-    <main class="admin-grid">
-        <section class="admin-card admin-card--map">
-            <div class="admin-card__header">
-                <h2><i class="fas fa-map"></i> Conductores en vivo</h2>
-                <span class="badge" id="driversCount">0 conductores</span>
-            </div>
-            <div id="adminMap" class="admin-map" role="application" aria-label="Mapa de conductores"></div>
-            <p class="admin-map__hint">Estado en vivo: verde disponible, rojo en viaje.</p>
+    <section class="admin-kpi-grid">
+        <article class="kpi-card">
+            <p>Hora sincronizada</p>
+            <strong id="adminLiveClock" data-live-clock>--:--:--</strong>
+            <small>Zona horaria del servidor</small>
+        </article>
+        <article class="kpi-card">
+            <p>Motos activas</p>
+            <strong id="kpiActiveDriversValue">0</strong>
+            <small id="kpiActiveDriversInfo">Sincronizando...</small>
+        </article>
+        <article class="kpi-card">
+            <p>Usuarios activos</p>
+            <strong id="kpiActiveUsersValue">0</strong>
+            <small>Últimos 5 minutos</small>
+        </article>
+        <article class="kpi-card">
+            <p>Viajes de hoy</p>
+            <strong id="kpiCompletedTodayValue">0</strong>
+            <small id="kpiCompletedTodayInfo">Pendientes de sincronizar</small>
+        </article>
+        <article class="kpi-card">
+            <p>Ingresos acumulados</p>
+            <strong id="kpiEarningsValue">$0.00</strong>
+            <small>Total en la base de datos</small>
+        </article>
+    </section>
+
+    <main class="admin-board">
+        <section class="admin-row">
+            <section class="admin-card admin-card--map">
+                <div class="admin-card__header">
+                    <h2><i class="fas fa-map"></i> Conductores en vivo</h2>
+                    <span class="badge" id="driversCount">0 conductores</span>
+                </div>
+                <div id="adminMap" class="admin-map" role="application" aria-label="Mapa de conductores"></div>
+                <p class="admin-map__hint">Estado en vivo: verde disponible, rojo en viaje.</p>
+            </section>
+
+            <section class="admin-card admin-card--emergencies">
+                <div class="admin-card__header">
+                    <h2><i class="fas fa-bell"></i> Emergencias</h2>
+                    <button id="refreshEmergencies" class="icon-btn" aria-label="Actualizar emergencias"><i class="fas fa-sync"></i></button>
+                </div>
+                <ul id="emergencyList" class="emergency-list">
+                    <li class="empty-state">Sin alertas recientes</li>
+                </ul>
+            </section>
         </section>
 
-        <section class="admin-card">
+        <section class="admin-row admin-row--data">
+            <section class="admin-card admin-card--stack">
             <div class="admin-card__header">
                 <h2><i class="fas fa-users-gear"></i> Usuarios</h2>
                 <button id="refreshUsers" class="icon-btn" aria-label="Actualizar usuarios"><i class="fas fa-sync"></i></button>
@@ -95,7 +152,7 @@
             </form>
         </section>
 
-        <section class="admin-card">
+        <section class="admin-card admin-card--stack">
             <div class="admin-card__header">
                 <h2><i class="fas fa-dollar-sign"></i> Tarifas</h2>
                 <button id="refreshPricing" class="icon-btn" aria-label="Actualizar tarifas"><i class="fas fa-sync"></i></button>
@@ -133,15 +190,6 @@
                 </button>
             </form>
         </section>
-
-        <section class="admin-card admin-card--wide">
-            <div class="admin-card__header">
-                <h2><i class="fas fa-bell"></i> Emergencias</h2>
-                <button id="refreshEmergencies" class="icon-btn" aria-label="Actualizar emergencias"><i class="fas fa-sync"></i></button>
-            </div>
-            <ul id="emergencyList" class="emergency-list">
-                <li class="empty-state">Sin alertas recientes</li>
-            </ul>
         </section>
     </main>
 
@@ -149,6 +197,7 @@
 
     <script src="theme.js"></script>
     <script src="sessionManager.js"></script>
+    <script src="time-sync.js"></script>
     <script src="admin.js"></script>
 </body>
 </html>
