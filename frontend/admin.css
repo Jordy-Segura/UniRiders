@@ -466,6 +466,12 @@ body.admin-body {
     }
 }
 
+@media (min-width: 1100px) {
+    .admin-row:first-of-type {
+        grid-template-columns: 1.3fr 0.9fr;
+    }
+}
+
 @media (max-width: 600px) {
     .admin-card__header {
         flex-direction: column;
