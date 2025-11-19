@@ -87,12 +87,11 @@ async function ensureAdminInfrastructure() {
             BEGIN
                 CREATE TABLE Tarifas (
                     id INT IDENTITY(1,1) PRIMARY KEY,
-                    nombre NVARCHAR(120) NOT NULL,
+                    nombre NVARCHAR(100) NOT NULL,
                     descripcion NVARCHAR(255) NULL,
                     precio DECIMAL(10,2) NOT NULL,
                     activo BIT NOT NULL DEFAULT 1,
-                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE(),
-                    creado_por NVARCHAR(150) NULL
+                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE()
                 );
             END
         `);
@@ -111,6 +110,21 @@ async function ensureAdminInfrastructure() {
                     fecha DATETIME NOT NULL DEFAULT GETDATE(),
                     atendido_por NVARCHAR(150) NULL
                 );
+            END
+        `);
+
+        await pool.request().query(`
+            IF OBJECT_ID('dbo.Vehiculos', 'U') IS NULL
+            BEGIN
+                CREATE TABLE Vehiculos (
+                    id_vehiculo INT IDENTITY(1,1) PRIMARY KEY,
+                    email_conductor NVARCHAR(150) NOT NULL,
+                    marca NVARCHAR(100) NOT NULL,
+                    modelo NVARCHAR(100) NOT NULL
+                );
+                ALTER TABLE Vehiculos WITH CHECK
+                ADD CONSTRAINT FK_Vehiculos_Usuarios FOREIGN KEY (email_conductor)
+                REFERENCES Usuarios(email);
             END
         `);
 
@@ -184,25 +198,25 @@ async function updateRealTimeStats() {
         
         // Contar viajes activos
         const activeTripsResult = await pool.request()
-            .query("SELECT COUNT(*) as active_trips FROM Viajes WHERE estado = 'ACEPTADO'");
+            .query("SELECT COUNT(*) as active_trips FROM Viajes WHERE estado = 'aceptado'");
         
         const activeTrips = activeTripsResult.recordset[0]?.active_trips || 0;
         
         // Contar viajes completados hoy
         const completedTodayResult = await pool.request()
-            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'COMPLETADO' AND CAST(fecha_finalizacion AS DATE) = CAST(GETDATE() AS DATE)");
+            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'finalizado' AND CAST(fecha_finalizacion AS DATE) = CAST(GETDATE() AS DATE)");
         
         const completedToday = completedTodayResult.recordset[0]?.completed_today || 0;
         
         // Actualizar tabla de estadísticas
         await pool.request()
             .query(`
-                UPDATE EstadisticasApp SET 
+                UPDATE EstadisticasApp SET
                 usuarios_activos = ${activeUsers},
                 viajes_activos = ${activeTrips},
-                viajes_completados = (SELECT COUNT(*) FROM Viajes WHERE estado = 'COMPLETADO'),
-                ingresos_totales = (SELECT ISNULL(SUM(costo), 0) FROM Viajes WHERE estado = 'COMPLETADO'),
-                ultima_actualizacion = GETDATE()
+                viajes_completados = (SELECT COUNT(*) FROM Viajes WHERE estado = 'finalizado'),
+                ingresos_totales = (SELECT dbo.fn_TotalIngresos()),
+                fecha_reporte = CAST(GETDATE() AS DATE)
             `);
             
         return { activeUsers, activeTrips, completedToday };
@@ -223,30 +237,21 @@ async function getTripHistory(email, role) {
 
     try {
         const pool = await poolPromise;
-        let query;
-
-        if (role === 'conductor') {
-            query = `
-                SELECT TOP 10 id_viaje, pasajero_email, origen, destino, estado, costo,
-                       fecha_solicitud, fecha_aceptacion, fecha_finalizacion, calificacion_pasajero
-                FROM Viajes
-                WHERE LOWER(conductor_email) = @email
-                ORDER BY fecha_solicitud DESC
-            `;
-        } else {
-            query = `
-                SELECT TOP 10 id_viaje, conductor_email, origen, destino, estado, costo,
-                       fecha_solicitud, fecha_aceptacion, fecha_finalizacion, calificacion_conductor
-                FROM Viajes
-                WHERE LOWER(pasajero_email) = @email
-                ORDER BY fecha_solicitud DESC
-            `;
-        }
+        const filterColumn = role === 'conductor' ? 'v.conductor_email' : 'v.pasajero_email';
+        const historyQuery = `
+            SELECT TOP 10 d.id_viaje, d.pasajero_email, d.conductor_email, d.origen, d.destino,
+                   d.estado, d.costo, d.metodo_pago, d.fecha_solicitud, d.fecha_aceptacion,
+                   d.fecha_finalizacion, d.pasajero, d.conductor, d.tarifa
+            FROM vw_Viajes_Detalle d
+            INNER JOIN Viajes v ON v.id_viaje = d.id_viaje
+            WHERE LOWER(${filterColumn}) = @email
+            ORDER BY d.fecha_solicitud DESC
+        `;
 
         const result = await pool.request()
             .input("email", sql.NVarChar, normalizedEmail)
-            .query(query);
-            
+            .query(historyQuery);
+
         return result.recordset;
     } catch (err) {
         console.log('Error obteniendo historial:', err);
@@ -268,7 +273,7 @@ async function initializeStatistics() {
         // Intentar obtener estadísticas de viajes si las tablas existen
         try {
             const tripsResult = await pool.request()
-                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE estado = 'COMPLETADO'");
+                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE estado = 'finalizado'");
             appStatistics.completedTrips = tripsResult.recordset[0].completedTrips || 0;
         } catch (err) {
             // Si no existe la tabla Viajes, usar valores por defecto
@@ -277,7 +282,7 @@ async function initializeStatistics() {
         
         try {
             const earningsResult = await pool.request()
-                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE estado = 'COMPLETADO'");
+                .query("SELECT dbo.fn_TotalIngresos() as totalEarnings");
             appStatistics.totalEarnings = earningsResult.recordset[0].totalEarnings || 0;
         } catch (err) {
             // Si no existe la columna costo, calcular basado en viajes completados
@@ -303,6 +308,26 @@ function parseCoordinateString(coordString) {
         lat: parseFloat(matches[0]),
         lon: parseFloat(matches[1])
     };
+}
+
+async function getDefaultTariffId() {
+    try {
+        const pool = await poolPromise;
+        const tariffResult = await pool.request().query(`
+            SELECT TOP 1 id
+            FROM Tarifas
+            WHERE activo = 1
+            ORDER BY precio ASC, id ASC
+        `);
+
+        if (tariffResult.recordset.length) {
+            return tariffResult.recordset[0].id;
+        }
+    } catch (err) {
+        console.log('No se pudo obtener la tarifa por defecto:', err);
+    }
+
+    return null;
 }
 
 // =========================================================
@@ -422,8 +447,12 @@ app.post("/api/verify-registration", async (req, res) => {
             .input("email", sql.NVarChar, normalizedEmail)
             .input("password", sql.NVarChar, hashedPassword)
             .input("rol", sql.NVarChar, role)
+            .execute('sp_Seguro_RegistrarUsuario');
+
+        await pool.request()
+            .input("email", sql.NVarChar, normalizedEmail)
             .input("telefono", sql.NVarChar, phone || null)
-            .query(`INSERT INTO Usuarios (nombre, email, password, rol, metodo_pago_pref, telefono_whatsapp) VALUES (@nombre, @email, @password, @rol, 'Efectivo', @telefono)`);
+            .query(`UPDATE Usuarios SET metodo_pago_pref = 'Efectivo', telefono_whatsapp = @telefono WHERE LOWER(email) = @email`);
 
         // Actualizar estadísticas
         appStatistics.totalUsers++;
@@ -847,7 +876,6 @@ app.get("/api/admin/pricing", requireAdmin, async (req, res) => {
 
 app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
     const { nombre, descripcion, precio, activo = true } = req.body;
-    const adminEmail = req.headers['user-email'];
 
     if (!nombre || precio === undefined) {
         return res.status(400).json({ message: "Nombre y precio son obligatorios" });
@@ -860,10 +888,9 @@ app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
             .input("descripcion", sql.NVarChar, descripcion || null)
             .input("precio", sql.Decimal(10,2), parseFloat(precio))
             .input("activo", sql.Bit, activo ? 1 : 0)
-            .input("creado_por", sql.NVarChar, adminEmail || null)
             .query(`
-                INSERT INTO Tarifas (nombre, descripcion, precio, activo, creado_por)
-                VALUES (@nombre, @descripcion, @precio, @activo, @creado_por)
+                INSERT INTO Tarifas (nombre, descripcion, precio, activo)
+                VALUES (@nombre, @descripcion, @precio, @activo)
             `);
 
         res.status(201).json({ message: "Tarifa creada" });
@@ -1015,7 +1042,7 @@ app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
                 const status = trip.status || trip.estado;
                 if (!driverEmail) return false;
                 if (driverEmail !== email) return false;
-                return status && status !== 'FINALIZADO';
+                return status && status !== 'finalizado';
             });
 
             response.push({
@@ -1094,13 +1121,19 @@ app.get("/api/stats/overview", async (req, res) => {
             .query("SELECT COUNT(*) as total_users FROM Usuarios");
         
         const totalUsers = totalUsersResult.recordset[0]?.total_users || 0;
-        
+
+        const earningsResult = await pool.request()
+            .query("SELECT dbo.fn_TotalIngresos() as total_earnings");
+
+        const completedResult = await pool.request()
+            .query("SELECT COUNT(*) as completed_trips FROM Viajes WHERE estado = 'finalizado'");
+
         res.json({
             totalUsers: totalUsers,
             activeTrips: realStats.activeTrips,
-            completedTrips: realStats.completedToday,
+            completedTrips: completedResult.recordset[0]?.completed_trips || realStats.completedToday,
             activeUsers: realStats.activeUsers,
-            totalEarnings: 0 // Se calculará automáticamente
+            totalEarnings: earningsResult.recordset[0]?.total_earnings || 0
         });
     } catch (err) {
         res.json({
@@ -1198,11 +1231,16 @@ app.get("/api/trips/offers", (req, res) => {
 // Ruta para crear viaje en base de datos
 app.post("/api/trips/request", async (req, res) => {
     const { passengerName, origin, destination, paymentMethod, passengerEmail } = req.body;
-    
+
     if (!passengerName || !origin || !destination) {
         return res.status(400).json({ message: "Datos incompletos" });
     }
-    
+
+    const tarifaId = await getDefaultTariffId();
+    if (!tarifaId) {
+        return res.status(500).json({ message: "No existe una tarifa activa para registrar el viaje" });
+    }
+
     const newTrip = {
         id: Date.now(),
         passenger: passengerName,
@@ -1213,26 +1251,30 @@ app.post("/api/trips/request", async (req, res) => {
         timestamp: new Date().toLocaleTimeString(),
         originCoords: `Lat: -1.65, Lon: -78.68`,
         destinationCoords: `Lat: -1.66, Lon: -78.69`,
-        status: 'PENDIENTE'
+        status: 'pendiente',
+        tariffId: tarifaId
     };
-    
+
     // Guardar en base de datos
     try {
         const pool = await poolPromise;
         const result = await pool.request()
-            .input("passengerEmail", sql.NVarChar, passengerEmail)
-            .input("origin", sql.NVarChar, origin)
-            .input("destination", sql.NVarChar, destination)
-            .input("paymentMethod", sql.NVarChar, paymentMethod || 'Efectivo')
-            .query(`
-                INSERT INTO Viajes (pasajero_email, origen, destino, metodo_pago, estado) 
-                OUTPUT INSERTED.id_viaje
-                VALUES (@passengerEmail, @origin, @destination, @paymentMethod, 'PENDIENTE')
-            `);
-            
-        newTrip.id = result.recordset[0].id_viaje;
+            .input("pasajero_email", sql.NVarChar, passengerEmail)
+            .input("conductor_email", sql.NVarChar, null)
+            .input("id_tarifa", sql.Int, tarifaId)
+            .input("origen", sql.NVarChar, origin)
+            .input("destino", sql.NVarChar, destination)
+            .input("metodo_pago", sql.NVarChar, paymentMethod || 'Efectivo')
+            .execute('sp_RegistrarViaje');
+
+        if (result.recordset?.length) {
+            newTrip.id = result.recordset[0].id_viaje;
+        } else {
+            return res.status(500).json({ message: "No se pudo registrar el viaje" });
+        }
     } catch (dbErr) {
         console.log('Error guardando viaje en BD:', dbErr);
+        return res.status(500).json({ message: "No se pudo registrar el viaje" });
     }
     
     globalTripOffers.push(newTrip);
@@ -1264,7 +1306,7 @@ app.post("/api/trips/accept", async (req, res) => {
             ...trip,
             driver: driverName,
             driverEmail: driverEmail,
-            status: 'ACEPTADO',
+            status: 'aceptado',
             startTime: new Date(),
             driverLocation: { lat: -1.65, lon: -78.68 },
             passengerLocation: fallbackPassengerLocation || null
@@ -1274,15 +1316,16 @@ app.post("/api/trips/accept", async (req, res) => {
         try {
             const pool = await poolPromise;
             await pool.request()
-                .input("tripId", sql.Int, numericTripId)
+                .input("tripId", sql.Int, trip.id)
                 .input("driverEmail", sql.NVarChar, driverEmail)
                 .query(`
-                    UPDATE Viajes SET 
-                    conductor_email = @driverEmail,
-                    estado = 'ACEPTADO',
-                    fecha_aceptacion = GETDATE()
+                    UPDATE Viajes SET conductor_email = @driverEmail
                     WHERE id_viaje = @tripId
                 `);
+
+            await pool.request()
+                .input("id_viaje", sql.Int, trip.id)
+                .execute('sp_AceptarViaje');
         } catch (dbErr) {
             console.log('Error actualizando viaje en BD:', dbErr);
         }
@@ -1328,7 +1371,7 @@ app.get("/api/trips/:id/status", (req, res) => {
     
     const pendingTrip = globalTripOffers.find(t => t.id === tripId);
     if (pendingTrip) {
-        return res.json({ status: 'PENDIENTE', driver: null });
+        return res.json({ status: 'pendiente', driver: null });
     }
     
     return res.status(404).json({ message: "Viaje no encontrado" });
@@ -1377,7 +1420,7 @@ app.post("/api/trips/:id/resume", async (req, res) => {
         const trip = result.recordset[0];
         
         // Solo permitir reanudar viajes ACTIVOS
-        if (trip.estado !== 'ACEPTADO') {
+        if (trip.estado !== 'aceptado') {
             return res.status(400).json({ message: "Solo se pueden reanudar viajes activos" });
         }
 
@@ -1405,7 +1448,7 @@ app.post("/api/trips/:id/resume", async (req, res) => {
                     origin: tripData.origen,
                     destination: tripData.destino,
                     payment: tripData.metodo_pago,
-                    status: 'ACEPTADO',
+                    status: 'aceptado',
                     originCoords: `Lat: -1.65, Lon: -78.68`,
                     destinationCoords: `Lat: -1.66, Lon: -78.69`
                 };
@@ -1458,16 +1501,13 @@ app.post("/api/trips/complete", async (req, res) => {
         try {
             const pool = await poolPromise;
             await pool.request()
-                .input("tripId", sql.Int, numericTripId)
-                .input("driverEmail", sql.NVarChar, driverEmail)
-                .input("cost", sql.Decimal(10,2), tripCost)
-                .query(`
-                    UPDATE Viajes SET 
-                    estado = 'COMPLETADO', 
-                    fecha_finalizacion = GETDATE(),
-                    costo = @cost
-                    WHERE id_viaje = @tripId AND conductor_email = @driverEmail
-                `);
+                .input("id_viaje", sql.Int, trip.id)
+                .input("costo", sql.Decimal(10,2), tripCost)
+                .input("calif_pasajero", sql.Decimal(5,2), null)
+                .input("calif_conductor", sql.Decimal(5,2), null)
+                .input("coment_p", sql.NVarChar, null)
+                .input("coment_c", sql.NVarChar, null)
+                .execute('sp_FinalizarViaje');
         } catch (dbErr) {
             console.log('Error guardando viaje en BD:', dbErr);
         }
@@ -1508,7 +1548,7 @@ app.post("/api/trips/complete", async (req, res) => {
         }
 
         // Cambiar estado del viaje
-        globalActiveTrips[numericTripId].status = 'FINALIZADO';
+        globalActiveTrips[numericTripId].status = 'finalizado';
         globalActiveTrips[numericTripId].endTime = new Date();
         globalActiveTrips[numericTripId].cost = tripCost;
 
@@ -1780,7 +1820,7 @@ app.get("/api/stats/driver/:email", async (req, res) => {
         try {
             const tripsResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'COMPLETADO'");
+                .query("SELECT COUNT(*) as completedTrips FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'finalizado'");
             completedTrips = tripsResult.recordset[0].completedTrips || 0;
         } catch (err) {
             completedTrips = Math.floor(Math.random() * 20) + 10 + activeTrips;
@@ -1791,7 +1831,7 @@ app.get("/api/stats/driver/:email", async (req, res) => {
         try {
             const earningsResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'COMPLETADO'");
+                .query("SELECT ISNULL(SUM(costo), 0) as totalEarnings FROM Viajes WHERE LOWER(conductor_email) = @email AND estado = 'finalizado'");
             totalEarnings = parseFloat(earningsResult.recordset[0].totalEarnings || 0).toFixed(2);
         } catch (err) {
             totalEarnings = (completedTrips * 3.5).toFixed(2);
@@ -1863,26 +1903,27 @@ app.get("/api/profile/:email", async (req, res) => {
         const userData = userResult.recordset[0];
         
         // Calcular calificación promedio según el rol
-        const ratingQuery = userData.rol === 'conductor'
-            ? `SELECT AVG(CAST(calificacion_conductor AS FLOAT)) as avgRating
-                FROM Viajes
-                WHERE LOWER(conductor_email) = @email AND calificacion_conductor IS NOT NULL`
-            : `SELECT AVG(CAST(calificacion_pasajero AS FLOAT)) as avgRating
-                FROM Viajes
-                WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL`;
+        let ratingValue = 0;
+        if (userData.rol === 'conductor') {
+            const ratingResult = await pool.request()
+                .input("email", sql.NVarChar, normalizedEmail)
+                .query("SELECT dbo.fn_PromedioConductor(@email) as avgRating");
+            ratingValue = ratingResult.recordset[0]?.avgRating || 0;
+        } else {
+            const ratingResult = await pool.request()
+                .input("email", sql.NVarChar, normalizedEmail)
+                .query(`SELECT AVG(CAST(calificacion_pasajero AS FLOAT)) as avgRating FROM Viajes WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL`);
+            ratingValue = ratingResult.recordset[0]?.avgRating || 0;
+        }
 
-        const ratingResult = await pool.request()
-            .input("email", sql.NVarChar, normalizedEmail)
-            .query(ratingQuery);
-            
-        userData.avgRating = parseFloat(ratingResult.recordset[0]?.avgRating || 0).toFixed(1);
+        userData.avgRating = parseFloat(ratingValue || 0).toFixed(1);
         
         let vehicleData = {};
         if (userData.rol === 'conductor') {
             try {
                 const vehicleResult = await pool.request()
                     .input("email", sql.NVarChar, normalizedEmail)
-                    .query("SELECT marca, modelo, placa FROM Vehiculos WHERE LOWER(email_conductor) = @email");
+                    .query("SELECT marca, modelo FROM Vehiculos WHERE LOWER(email_conductor) = @email");
                 
                 if (vehicleResult.recordset.length > 0) {
                     vehicleData = vehicleResult.recordset[0];
@@ -1900,7 +1941,7 @@ app.get("/api/profile/:email", async (req, res) => {
 });
 
 app.post("/api/profile/update", async (req, res) => {
-    const { email, name, password, marca, modelo, placa, roleSwitch, paymentMethod, telefono } = req.body;
+    const { email, name, password, marca, modelo, roleSwitch, paymentMethod, telefono } = req.body;
     const requesterRole = req.headers['user-role'];
     const normalizedEmail = normalizeEmail(email);
 
@@ -1963,6 +2004,11 @@ app.post("/api/profile/update", async (req, res) => {
 
         await request.query(updateQuery);
 
+        if (desiredRole === 'conductor' && (!marca || !modelo)) {
+            await transaction.rollback();
+            return res.status(400).json({ message: "Los conductores deben registrar marca y modelo del vehículo" });
+        }
+
         if (desiredRole === 'conductor') {
             try {
                 const checkVehicle = await transaction.request()
@@ -1973,16 +2019,14 @@ app.post("/api/profile/update", async (req, res) => {
                     await transaction.request()
                         .input("marca", sql.NVarChar, marca)
                         .input("modelo", sql.NVarChar, modelo)
-                        .input("placa", sql.NVarChar, placa)
                         .input("email", sql.NVarChar, normalizedEmail)
-                        .query(`UPDATE Vehiculos SET marca = @marca, modelo = @modelo, placa = @placa WHERE LOWER(email_conductor) = @email`);
+                        .query(`UPDATE Vehiculos SET marca = @marca, modelo = @modelo WHERE LOWER(email_conductor) = @email`);
                 } else {
                     await transaction.request()
                         .input("marca", sql.NVarChar, marca)
                         .input("modelo", sql.NVarChar, modelo)
-                        .input("placa", sql.NVarChar, placa)
                         .input("email", sql.NVarChar, normalizedEmail)
-                        .query(`INSERT INTO Vehiculos (email_conductor, marca, modelo, placa) VALUES (@email, @marca, @modelo, @placa)`);
+                        .query(`INSERT INTO Vehiculos (email_conductor, marca, modelo) VALUES (@email, @marca, @modelo)`);
                 }
             } catch (err) {
                 // Si no existe la tabla Vehiculos, no hacer nada

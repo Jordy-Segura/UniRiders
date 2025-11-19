@@ -1069,7 +1069,7 @@
                             <strong>${trip.origen} → ${trip.destino}</strong>
                             <div style="font-size: 0.8em; color: #ccc;">
                                 ${formattedDate}
-                                ${trip.estado === 'COMPLETADO' ? ' - Completado' : ' - En curso'}
+                                ${trip.estado === 'finalizado' ? ' - Completado' : ' - En curso'}
                                 ${trip.costo ? ` - $${trip.costo}` : ''}
                             </div>
                         </div>
@@ -1493,7 +1493,7 @@
                 });
                 const data = await res.json();
 
-                if (data.status === 'ACEPTADO') {
+                if (data.status === 'aceptado') {
                     clearInterval(pollingStatusInterval);
                     pollingStatusInterval = null;
 
@@ -1523,10 +1523,10 @@
                     startChatSession(currentTripId);
                     startDriverLocationPolling(currentTripId);
 
-                } else if (data.status === 'PENDIENTE') {
+                } else if (data.status === 'pendiente') {
                     messageArea.innerText = "🔄 Esperando que un conductor acepte la oferta...";
-                } else if (data.status === 'FINALIZADO') {
-                    // VIAJE FINALIZADO AUTOMÁTICAMENTE
+                } else if (data.status === 'finalizado') {
+                    // VIAJE finalizado AUTOMÁTICAMENTE
                     clearInterval(pollingStatusInterval);
                     pollingStatusInterval = null;
                     
@@ -1924,7 +1924,7 @@
                 
                 const data = await res.json();
                 
-                if (data.status === 'ACEPTADO') {
+                if (data.status === 'aceptado') {
                     currentTripId = tripId;
                     
                     requestPanel.style.display = 'none'; 
