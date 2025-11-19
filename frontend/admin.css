@@ -153,23 +153,28 @@ body.admin-body {
 }
 
 
+
 .admin-board {
     display: flex;
     flex-direction: column;
-    gap: 1.75rem;
+    gap: 2rem;
     padding: 0 clamp(1rem, 4vw, 3rem) 3rem;
 }
 
-.admin-row {
+.admin-layout {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 1.5rem;
-    align-items: stretch;
+    align-items: start;
 }
 
-.admin-row--data {
-    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+.admin-layout--primary {
+    grid-template-columns: minmax(420px, 1.6fr) minmax(320px, 1fr);
 }
+
+.admin-layout--data {
+    grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+}
+
 
 .admin-card--emergencies {
     min-height: 100%;
@@ -188,6 +193,18 @@ body.admin-body {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+}
+
+.admin-split {
+    display: grid;
+    grid-template-columns: minmax(320px, 1.35fr) minmax(260px, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.admin-split__panel--form {
+    position: sticky;
+    top: 1rem;
 }
 
 .admin-card__header {
@@ -420,6 +437,20 @@ body.admin-body {
     padding: 1rem;
 }
 
+@media (max-width: 1100px) {
+    .admin-layout--primary {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-split {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-split__panel--form {
+        position: static;
+    }
+}
+
 @media (max-width: 920px) {
     .admin-header {
         flex-direction: column;
@@ -428,6 +459,10 @@ body.admin-body {
     .admin-header__actions {
         width: 100%;
         justify-content: space-between;
+    }
+
+    .admin-layout--data {
+        grid-template-columns: 1fr;
     }
 }
 
