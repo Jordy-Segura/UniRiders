@@ -310,6 +310,37 @@ function parseCoordinateString(coordString) {
     };
 }
 
+function formatTripTimestamp(dateValue) {
+    const formatOptions = { hour: '2-digit', minute: '2-digit' };
+    if (!dateValue) {
+        return new Date().toLocaleTimeString('es-EC', formatOptions);
+    }
+
+    try {
+        return new Date(dateValue).toLocaleTimeString('es-EC', formatOptions);
+    } catch (err) {
+        return new Date().toLocaleTimeString('es-EC', formatOptions);
+    }
+}
+
+function mapDbTripToOffer(row = {}) {
+    const fallbackTrip = globalTripOffers.find(t => t.id === row.id_viaje) || {};
+
+    return {
+        id: row.id_viaje ?? fallbackTrip.id,
+        passenger: row.pasajero || fallbackTrip.passenger || row.pasajero_email || fallbackTrip.passengerEmail || 'Pasajero',
+        passengerEmail: row.pasajero_email || fallbackTrip.passengerEmail || null,
+        origin: row.origen || fallbackTrip.origin || 'Origen no disponible',
+        destination: row.destino || fallbackTrip.destination || 'Destino no disponible',
+        payment: row.metodo_pago || fallbackTrip.payment || 'Efectivo',
+        timestamp: row.fecha_solicitud ? formatTripTimestamp(row.fecha_solicitud) : (fallbackTrip.timestamp || formatTripTimestamp()),
+        originCoords: fallbackTrip.originCoords || 'Lat: -1.65, Lon: -78.68',
+        destinationCoords: fallbackTrip.destinationCoords || 'Lat: -1.66, Lon: -78.69',
+        status: row.estado || fallbackTrip.status || 'pendiente',
+        tariffId: row.id_tarifa || fallbackTrip.tariffId || null
+    };
+}
+
 async function getDefaultTariffId() {
     try {
         const pool = await poolPromise;
@@ -1223,8 +1254,24 @@ app.post("/api/chat/:tripId/save", async (req, res) => {
 // RUTAS DE VIAJES MEJORADAS
 // =========================================================
 
-app.get("/api/trips/offers", (req, res) => {
-    res.json(globalTripOffers);
+app.get("/api/trips/offers", async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                   v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
+            FROM Viajes v
+            INNER JOIN Usuarios u ON v.pasajero_email = u.email
+            WHERE v.estado = 'pendiente'
+            ORDER BY v.fecha_solicitud DESC
+        `);
+
+        const offers = result.recordset.map(mapDbTripToOffer);
+        return res.json(offers);
+    } catch (err) {
+        console.log('No se pudieron obtener las ofertas desde la base de datos, usando memoria:', err.message);
+        return res.json(globalTripOffers);
+    }
 });
 
 // Ruta para crear viaje en base de datos
@@ -1289,16 +1336,37 @@ app.post("/api/trips/request", async (req, res) => {
 app.post("/api/trips/accept", async (req, res) => {
     try {
         const { tripId, driverName, driverEmail } = req.body;
-        
+
         const numericTripId = parseInt(tripId);
-        const tripIndex = globalTripOffers.findIndex(trip => trip.id === numericTripId);
-        
-        if (tripIndex === -1) {
-            return res.status(404).json({ message: "Viaje no encontrado" });
+        if (Number.isNaN(numericTripId)) {
+            return res.status(400).json({ message: "Identificador de viaje inválido" });
         }
 
-        const trip = globalTripOffers.splice(tripIndex, 1)[0];
-        
+        const pool = await poolPromise;
+
+        let trip;
+        const tripIndex = globalTripOffers.findIndex(trip => trip.id === numericTripId);
+
+        if (tripIndex !== -1) {
+            trip = globalTripOffers.splice(tripIndex, 1)[0];
+        } else {
+            const dbTripResult = await pool.request()
+                .input("tripId", sql.Int, numericTripId)
+                .query(`
+                    SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                           v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
+                    FROM Viajes v
+                    INNER JOIN Usuarios u ON v.pasajero_email = u.email
+                    WHERE v.id_viaje = @tripId AND v.estado = 'pendiente'
+                `);
+
+            if (!dbTripResult.recordset.length) {
+                return res.status(404).json({ message: "Viaje no encontrado" });
+            }
+
+            trip = mapDbTripToOffer(dbTripResult.recordset[0]);
+        }
+
         const fallbackPassengerLocation = parseCoordinateString(trip.originCoords);
 
         globalActiveTrips[numericTripId] = {
@@ -1313,7 +1381,6 @@ app.post("/api/trips/accept", async (req, res) => {
 
         // Actualizar en base de datos
         try {
-            const pool = await poolPromise;
             await pool.request()
                 .input("tripId", sql.Int, trip.id)
                 .input("driverEmail", sql.NVarChar, driverEmail)
@@ -1323,7 +1390,7 @@ app.post("/api/trips/accept", async (req, res) => {
                 `);
 
             await pool.request()
-                .input("id_viaje", sql.Int, trip.id)
+                .input("id_viaje", sql.Int, numericTripId)
                 .execute('sp_AceptarViaje');
         } catch (dbErr) {
             console.log('Error actualizando viaje en BD:', dbErr);
@@ -1341,14 +1408,14 @@ app.post("/api/trips/accept", async (req, res) => {
             sender: "Sistema UniRiders",
             message: `🚗 ${driverName} ha aceptado tu viaje. Está en camino hacia ti.`,
             timestamp: new Date().toISOString(),
-            displayTime: new Date().toLocaleTimeString('es-ES', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            displayTime: new Date().toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit'
             }),
             type: "system"
         });
 
-        res.json({ 
+        res.json({
             message: "Viaje aceptado exitosamente",
             trip: globalActiveTrips[numericTripId]
         });
