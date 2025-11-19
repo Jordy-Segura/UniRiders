@@ -384,7 +384,6 @@ app.post("/api/register", validateEspochEmail, async (req, res) => {
             return res.status(400).json({ message: "El correo ya está registrado" });
         }
 
-        const targetRole = isMasterAdmin ? 'administrador' : role;
         const verificationCode = generateVerificationCode();
         verificationCodes.set(normalizedEmail, {
             code: verificationCode,
