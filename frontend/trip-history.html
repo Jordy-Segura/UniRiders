@@ -87,6 +87,17 @@
             color: rgba(255, 255, 255, 0.75);
         }
 
+        .live-clock-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 999px;
+            font-size: 0.85em;
+            letter-spacing: 0.5px;
+        }
+
         .back-btn {
             background: none;
             border: none;
@@ -425,7 +436,10 @@
             <button class="back-btn" onclick="goBack()">
                 <i class="fas fa-arrow-left"></i>
             </button>
-            <h1><i class="fas fa-history"></i> Mis Últimos Viajes</h1>
+            <div>
+                <h1><i class="fas fa-history"></i> Mis Últimos Viajes</h1>
+                <span class="live-clock-chip" id="historyLiveClock" data-live-clock>--:--:--</span>
+            </div>
         </div>
 
         <div class="summary-cards" id="historySummary">
@@ -478,6 +492,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
     <script>
         const API = "http://localhost:3000/api";
         

@@ -34,6 +34,42 @@ body.admin-body {
     color: rgba(255, 255, 255, 0.7);
 }
 
+.admin-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    padding: 0 clamp(1rem, 4vw, 3rem) 2rem;
+    color: white;
+}
+
+.kpi-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1rem;
+    padding: 1rem 1.2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.kpi-card p {
+    margin: 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(226, 232, 240, 0.8);
+}
+
+.kpi-card strong {
+    font-size: 1.7rem;
+    font-weight: 700;
+}
+
+.kpi-card small {
+    color: rgba(226, 232, 240, 0.65);
+    font-size: 0.8rem;
+}
+
 .admin-header__actions {
     display: flex;
     align-items: stretch;
@@ -80,11 +116,33 @@ body.admin-body {
     background: rgba(239, 68, 68, 0.9);
 }
 
-.admin-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+
+.admin-layout {
+    display: flex;
+    flex-wrap: wrap;
     gap: 1.5rem;
-    padding: 0  clamp(1rem, 4vw, 3rem) 3rem;
+    padding: 0 clamp(1rem, 4vw, 3rem) 3rem;
+}
+
+.admin-column {
+    flex: 1;
+    min-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.admin-column--wide {
+    flex: 1.1;
+}
+
+@media (max-width: 1024px) {
+    .admin-layout {
+        flex-direction: column;
+    }
+    .admin-column--wide {
+        flex: 1;
+    }
 }
 
 .admin-card {

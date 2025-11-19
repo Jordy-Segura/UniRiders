@@ -12,6 +12,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { sendRecoveryMail, sendVerificationMail, sendAdminLoginMail } = require('./mailer');
+const https = require('https');
 
 const app = express();
 app.use(cors());
@@ -43,6 +44,8 @@ const appStatistics = {
 const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_LOWER = DEFAULT_ADMIN_EMAIL.toLowerCase();
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
+const CALLMEBOT_API_KEY = process.env.CALLMEBOT_API_KEY || process.env.WHATSAPP_ALERT_API_KEY || null;
+const DRIVER_LOCATION_TTL_MS = 5 * 60 * 1000;
 
 const PUBLIC_REGISTRATION_ROLES = ['pasajero', 'conductor'];
 const ADMIN_MANAGEABLE_ROLES = ['pasajero', 'conductor', 'administrador'];
@@ -59,6 +62,52 @@ function sanitizePhoneNumber(phone) {
     if (!phone) return null;
     const digits = String(phone).replace(/\D/g, "");
     return digits.length ? digits : null;
+}
+
+function isDriverBusy(email) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) return false;
+
+    return Object.values(globalActiveTrips).some(trip => {
+        if (!trip) return false;
+        const driverEmail = normalizeEmail(trip.driverEmail || trip.conductor_email || trip.driver);
+        const status = (trip.status || trip.estado || '').toLowerCase();
+        if (!driverEmail || driverEmail !== normalizedEmail) return false;
+        return status && status !== 'finalizado' && status !== 'cancelado';
+    });
+}
+
+function fireAndForgetHttpsGet(url) {
+    return new Promise(resolve => {
+        const request = https.get(url, (response) => {
+            response.on('data', () => {});
+            response.on('end', () => resolve({ statusCode: response.statusCode }));
+        });
+
+        request.on('error', (error) => {
+            resolve({ error: error.message });
+        });
+
+        request.end();
+    });
+}
+
+async function notifyAdminsViaWhatsApp(contacts = [], alertMessage = '') {
+    if (!CALLMEBOT_API_KEY) {
+        return [];
+    }
+
+    const requests = contacts
+        .map(contact => {
+            const normalizedPhone = sanitizePhoneNumber(contact.phone || contact.normalizedPhone);
+            if (!normalizedPhone) return null;
+            const encodedMessage = encodeURIComponent(alertMessage);
+            return `https://api.callmebot.com/whatsapp.php?phone=${normalizedPhone}&text=${encodedMessage}&apikey=${CALLMEBOT_API_KEY}`;
+        })
+        .filter(Boolean)
+        .map(url => fireAndForgetHttpsGet(url));
+
+    return Promise.all(requests);
 }
 
 function requireAdmin(req, res, next) {
@@ -218,12 +267,12 @@ async function updateRealTimeStats() {
                 ingresos_totales = (SELECT dbo.fn_TotalIngresos()),
                 fecha_reporte = CAST(GETDATE() AS DATE)
             `);
-            
-        return { activeUsers, activeTrips, completedToday };
-        
+
+        return { activeUsers, activeTrips, completedToday, syncedAt: new Date().toISOString() };
+
     } catch (err) {
         console.log('Error actualizando estadísticas:', err);
-        return { activeUsers: 5, activeTrips: 0, completedToday: 0 };
+        return { activeUsers: 5, activeTrips: 0, completedToday: 0, syncedAt: new Date().toISOString() };
     }
 }
 
@@ -1047,9 +1096,14 @@ app.post("/api/admin/emergencies/:id/resolve", requireAdmin, async (req, res) =>
 
 app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
     try {
-        const driverEmails = Array.from(driverLocations.keys());
-        const response = [];
+        const now = Date.now();
+        const freshEntries = Array.from(driverLocations.entries()).filter(([_, location]) => {
+            if (!location) return false;
+            return now - (location.timestamp || 0) <= DRIVER_LOCATION_TTL_MS;
+        });
 
+        const driverEmails = freshEntries.map(([email]) => email);
+        const response = [];
         let namesMap = new Map();
 
         if (driverEmails.length > 0) {
@@ -1064,23 +1118,13 @@ app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
             result.recordset.forEach(row => namesMap.set(row.email, row.nombre));
         }
 
-        driverEmails.forEach(email => {
-            const location = driverLocations.get(email);
-            const isBusy = Object.values(globalActiveTrips).some(trip => {
-                if (!trip) return false;
-                const driverEmail = trip.driverEmail || trip.conductor_email || trip.driver;
-                const status = trip.status || trip.estado;
-                if (!driverEmail) return false;
-                if (driverEmail !== email) return false;
-                return status && status !== 'finalizado';
-            });
-
+        freshEntries.forEach(([email, location]) => {
             response.push({
                 email,
                 name: namesMap.get(email) || email,
                 lat: location.lat,
                 lon: location.lon,
-                available: !isBusy,
+                available: !isDriverBusy(email),
                 lastUpdate: location.timestamp
             });
         });
@@ -1089,6 +1133,35 @@ app.get("/api/admin/driver-locations", requireAdmin, async (req, res) => {
     } catch (err) {
         res.status(500).json({ message: "Error al obtener ubicaciones" });
     }
+});
+
+app.get("/api/drivers/active", (req, res) => {
+    const now = Date.now();
+    const drivers = [];
+
+    driverLocations.forEach((location, email) => {
+        if (!location) return;
+        if (now - (location.timestamp || 0) > DRIVER_LOCATION_TTL_MS) return;
+
+        drivers.push({
+            email,
+            lat: location.lat,
+            lon: location.lon,
+            available: !isDriverBusy(email),
+            lastUpdate: location.timestamp
+        });
+    });
+
+    const available = drivers.filter(driver => driver.available).length;
+    const busy = drivers.length - available;
+
+    res.json({
+        count: drivers.length,
+        available,
+        busy,
+        lastUpdated: new Date(now).toISOString(),
+        drivers
+    });
 });
 
 app.post("/api/resend-verification", validateEspochEmail, async (req, res) => {
@@ -1163,7 +1236,9 @@ app.get("/api/stats/overview", async (req, res) => {
             activeTrips: realStats.activeTrips,
             completedTrips: completedResult.recordset[0]?.completed_trips || realStats.completedToday,
             activeUsers: realStats.activeUsers,
-            totalEarnings: earningsResult.recordset[0]?.total_earnings || 0
+            totalEarnings: earningsResult.recordset[0]?.total_earnings || 0,
+            completedToday: realStats.completedToday,
+            syncedAt: realStats.syncedAt
         });
     } catch (err) {
         res.json({
@@ -1171,7 +1246,27 @@ app.get("/api/stats/overview", async (req, res) => {
             activeTrips: 0,
             completedTrips: 25,
             activeUsers: 5,
-            totalEarnings: 87.50
+            totalEarnings: 87.50,
+            completedToday: 0,
+            syncedAt: new Date().toISOString()
+        });
+    }
+});
+
+app.get("/api/system/time", async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query("SELECT SYSDATETIMEOFFSET() AS serverTime");
+        const serverTime = result.recordset[0]?.serverTime || new Date().toISOString();
+        res.json({
+            serverTime,
+            epochMs: new Date(serverTime).getTime()
+        });
+    } catch (err) {
+        const fallback = new Date();
+        res.json({
+            serverTime: fallback.toISOString(),
+            epochMs: fallback.getTime()
         });
     }
 });
@@ -2290,14 +2385,32 @@ app.post("/api/emergency/alert", async (req, res) => {
                 name: contact.nombre,
                 email: contact.email,
                 phone: contact.telefono_whatsapp,
+                normalizedPhone,
                 whatsappLink
             };
         });
 
+        const alertSummaryLines = [
+            'Alerta de emergencia desde UniRiders',
+            `Usuario: ${userEmail || 'desconocido'}`
+        ];
+
+        if (message) {
+            alertSummaryLines.push(`Detalle: ${message}`);
+        }
+
+        if (lat !== null && lon !== null) {
+            alertSummaryLines.push(`Ubicación: https://maps.google.com/?q=${lat},${lon}`);
+        }
+
+        const whatsappDeliveries = await notifyAdminsViaWhatsApp(contacts, alertSummaryLines.join('\n'));
+
         res.json({
             success: true,
             message: "Alerta de emergencia enviada",
-            contacts
+            contacts,
+            whatsappDeliveries,
+            autoWhatsApp: whatsappDeliveries.length > 0 && CALLMEBOT_API_KEY
         });
     } catch (err) {
         res.status(500).json({ message: "No se pudo registrar la emergencia" });
