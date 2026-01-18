@@ -1,6 +1,4 @@
-const API = window.API || "https://uni-riders.vercel.app/";
-const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
-const DEFAULT_ADMIN_EMAIL_NORMALIZED = DEFAULT_ADMIN_EMAIL.toLowerCase();
+const API = window.API || "http://localhost:3000/api";
 
 function normalizeEmailValue(value) {
     return value ? value.trim().toLowerCase() : '';
@@ -34,11 +32,6 @@ const emergencyList = document.getElementById('emergencyList');
 const adminContactPhoneInput = document.getElementById('adminContactPhone');
 const adminNameEl = document.getElementById('adminName');
 const adminEmailEl = document.getElementById('adminEmail');
-const adminKeyForm = document.getElementById('adminKeyForm');
-const adminNewKeyInput = document.getElementById('adminNewKey');
-const adminCurrentKeyInput = document.getElementById('adminCurrentKey');
-const adminCurrentKeyWrapper = document.getElementById('adminCurrentKeyWrapper');
-const adminKeyHint = document.getElementById('adminKeyHint');
 const kpiActiveDriversValue = document.getElementById('kpiActiveDriversValue');
 const kpiActiveDriversInfo = document.getElementById('kpiActiveDriversInfo');
 const kpiActiveUsersValue = document.getElementById('kpiActiveUsersValue');
@@ -282,9 +275,9 @@ function renderEmergencies(emergencies) {
             <p>${alert.mensaje || 'Alerta recibida sin descripción'}</p>
             <span class="emergency-card__meta">${locationText}</span>
             <div class="emergency-card__actions">
-                ${hasLocation ? `<button type="button" class="submit-btn small-btn" data-action="focus-map" data-lat="${latValue}" data-lon="${lonValue}"><i class="fas fa-location-arrow"></i> Ver en mapa</button>` : ''}
+                ${hasLocation ? `<button class="submit-btn small-btn" data-action="focus-map" data-lat="${latValue}" data-lon="${lonValue}"><i class="fas fa-location-arrow"></i> Ver en mapa</button>` : ''}
                 ${alert.atendido ? `<span class="badge" style="background: rgba(34,197,94,0.15); color: #16a34a;">Atendido por ${alert.atendido_por || 'administración'}</span>`
-                : `<button type="button" class="submit-btn small-btn" data-action="resolve" data-id="${alert.id}"><i class="fas fa-check"></i> Marcar atendido</button>`}
+                : `<button class="submit-btn small-btn" data-action="resolve" data-id="${alert.id}"><i class="fas fa-check"></i> Marcar atendido</button>`}
             </div>
         `;
 
@@ -461,90 +454,23 @@ async function resolveEmergency(id) {
 }
 
 function focusEmergencyOnMap(lat, lon) {
+    if (!adminMap) return;
     const numericLat = parseFloat(lat);
     const numericLon = parseFloat(lon);
     if (Number.isNaN(numericLat) || Number.isNaN(numericLon)) return;
 
-    if (adminMap) {
-        adminMap.setView([numericLat, numericLon], 16);
-        const pulseMarker = L.circleMarker([numericLat, numericLon], {
-            radius: 12,
-            color: '#f97316',
-            fillColor: '#fb923c',
-            fillOpacity: 0.8,
-            weight: 2
-        }).addTo(adminMap);
+    adminMap.setView([numericLat, numericLon], 16);
+    const pulseMarker = L.circleMarker([numericLat, numericLon], {
+        radius: 12,
+        color: '#f97316',
+        fillColor: '#fb923c',
+        fillOpacity: 0.8,
+        weight: 2
+    }).addTo(adminMap);
 
-        setTimeout(() => {
-            adminMap.removeLayer(pulseMarker);
-        }, 8000);
-    }
-
-    const mapsUrl = `https://www.google.com/maps?q=${numericLat},${numericLon}`;
-    window.open(mapsUrl, '_blank', 'noopener');
-}
-
-function isDefaultAdminSession() {
-    return normalizeEmailValue(adminEmail) === DEFAULT_ADMIN_EMAIL_NORMALIZED;
-}
-
-function updateAdminKeyFormState() {
-    if (!adminKeyForm) return;
-    const isDefault = isDefaultAdminSession();
-    if (adminKeyHint) {
-        adminKeyHint.textContent = isDefault
-            ? 'Eres el administrador maestro: crea tu contraseña sin ingresar la clave actual.'
-            : 'Por seguridad ingresa tu clave actual antes de actualizarla.';
-    }
-
-    if (adminCurrentKeyWrapper) {
-        adminCurrentKeyWrapper.style.display = isDefault ? 'none' : '';
-    }
-
-    if (adminCurrentKeyInput) {
-        if (isDefault) {
-            adminCurrentKeyInput.value = '';
-            adminCurrentKeyInput.removeAttribute('required');
-        } else {
-            adminCurrentKeyInput.setAttribute('required', 'required');
-        }
-    }
-}
-
-async function saveAdminLoginKey(event) {
-    event.preventDefault();
-    if (!adminNewKeyInput) return;
-
-    const newPassword = adminNewKeyInput.value.trim();
-    const currentPassword = adminCurrentKeyInput?.value.trim();
-
-    if (!newPassword || newPassword.length < 8) {
-        showToast('La nueva clave debe tener al menos 8 caracteres', false);
-        return;
-    }
-
-    try {
-        const res = await fetch(`${API}/admin/login-key`, {
-            method: 'POST',
-            headers: baseHeaders(),
-            body: JSON.stringify({
-                newPassword,
-                currentPassword: currentPassword || undefined
-            })
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'No se pudo guardar la clave');
-
-        adminNewKeyInput.value = '';
-        if (adminCurrentKeyInput) {
-            adminCurrentKeyInput.value = '';
-        }
-
-        showToast(data.message || 'Clave actualizada');
-    } catch (error) {
-        showToast(error.message || 'Error al guardar la clave', false);
-    }
+    setTimeout(() => {
+        adminMap.removeLayer(pulseMarker);
+    }, 8000);
 }
 
 async function updateAdminContact(event) {
@@ -667,9 +593,6 @@ function attachEventListeners() {
     document.getElementById('newUserRole').addEventListener('change', updateManualUserPasswordRequirement);
     document.getElementById('createTariffForm').addEventListener('submit', createTariff);
     document.getElementById('adminContactForm').addEventListener('submit', updateAdminContact);
-    if (adminKeyForm) {
-        adminKeyForm.addEventListener('submit', saveAdminLoginKey);
-    }
     document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionManager.clearSession();
         window.location.href = 'Index.html';
@@ -739,7 +662,6 @@ function bootstrapAdminPanel() {
     initializeMap();
     attachEventListeners();
     updateManualUserPasswordRequirement();
-    updateAdminKeyFormState();
     loadUsers();
     loadPricing();
     loadEmergencies();

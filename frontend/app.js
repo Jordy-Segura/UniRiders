@@ -1,4 +1,4 @@
-const API = "https://uni-riders.vercel.app/";
+const API = "http://localhost:3000/api";
 window.API = API;
 
 function normalizeEmailValue(value) {

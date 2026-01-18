@@ -629,56 +629,6 @@ app.post("/api/admin/request-code", async (req, res) => {
     }
 });
 
-app.post("/api/admin/login-key", requireAdmin, async (req, res) => {
-    const adminEmailHeader = req.headers['user-email'];
-    const normalizedAdminEmail = normalizeEmail(adminEmailHeader);
-    const { currentPassword, newPassword } = req.body || {};
-
-    if (!normalizedAdminEmail) {
-        return res.status(400).json({ message: "Correo de administrador inválido" });
-    }
-
-    if (!newPassword || newPassword.length < 8) {
-        return res.status(400).json({ message: "La nueva clave debe tener al menos 8 caracteres" });
-    }
-
-    try {
-        const pool = await poolPromise;
-        const adminResult = await pool.request()
-            .input("email", sql.NVarChar, normalizedAdminEmail)
-            .query("SELECT password FROM Usuarios WHERE LOWER(email) = @email AND rol = 'administrador'");
-
-        if (adminResult.recordset.length === 0) {
-            return res.status(404).json({ message: "No existe un administrador con este correo" });
-        }
-
-        const storedPassword = adminResult.recordset[0].password || '';
-        const passwordAlreadySet = Boolean(storedPassword);
-        const isDefaultAdmin = normalizedAdminEmail === DEFAULT_ADMIN_EMAIL_LOWER;
-
-        if (!isDefaultAdmin && passwordAlreadySet) {
-            if (!currentPassword) {
-                return res.status(400).json({ message: "Debes ingresar tu clave actual" });
-            }
-
-            const matches = await bcrypt.compare(currentPassword, storedPassword);
-            if (!matches) {
-                return res.status(401).json({ message: "La clave actual no coincide" });
-            }
-        }
-
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await pool.request()
-            .input("email", sql.NVarChar, normalizedAdminEmail)
-            .input("password", sql.NVarChar, hashedPassword)
-            .query("UPDATE Usuarios SET password = @password WHERE LOWER(email) = @email");
-
-        res.json({ message: "Clave actualizada. Ya puedes ingresar con usuario y contraseña." });
-    } catch (err) {
-        res.status(500).json({ message: "No se pudo actualizar la clave" });
-    }
-});
-
 app.post("/api/admin/verify-code", async (req, res) => {
     const { email, code } = req.body;
     const normalizedEmail = normalizeEmail(email);
@@ -2577,5 +2527,5 @@ initializeStatistics();
 setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
 app.listen(API_PORT, () => {
-  console.log(`🚀 Servidor ejecutándose en https://uniriders.onrender.com`);
+  console.log(`🚀 Servidor ejecutándose en http://localhost:${API_PORT}`);
 });
