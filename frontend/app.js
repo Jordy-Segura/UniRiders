@@ -1,4 +1,4 @@
-const API = "https://uniriders.onrender.com";
+const API = "https://uni-riders.vercel.app/";
 window.API = API;
 
 function normalizeEmailValue(value) {

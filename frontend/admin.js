@@ -1,4 +1,4 @@
-const API = window.API || "https://uniriders.onrender.com";
+const API = window.API || "https://uni-riders.vercel.app/";
 const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_NORMALIZED = DEFAULT_ADMIN_EMAIL.toLowerCase();
 
