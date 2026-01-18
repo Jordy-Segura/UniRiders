@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Perfil - UniRiders</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo visual"></button>
+    <div class="floating-illustration floating-illustration--left floating-illustration--mini" aria-hidden="true">
+        <i class="fas fa-motorcycle"></i>
+    </div>
+    <span class="animated-ripple" style="width: 240px; height: 240px; left: 10%; top: 18%;"></span>
+    <span class="animated-ripple" style="width: 180px; height: 180px; left: 4%; top: 30%; animation-delay: 5s;"></span>
+
+    <div class="profile-card glass-effect">
+        <div class="profile-hero">
+            <div class="hero-heading">
+                <h1>Perfil UniRiders</h1>
+                <p id="profileGreeting">Personaliza tu experiencia rider en segundos.</p>
+                <span class="live-clock-chip" id="profileLiveClock" data-live-clock>--:--:--</span>
+            </div>
+        </div>
+
+        <div class="profile-insights">
+            <div class="insight-card">
+                <i class="fas fa-motorcycle"></i>
+                <div>
+                    <strong id="profileTrips">0</strong>
+                    <span>Viajes completados</span>
+                </div>
+            </div>
+            <div class="insight-card">
+                <i class="fas fa-star"></i>
+                <div>
+                    <strong id="profileAverage">0.0</strong>
+                    <span>Calificación global</span>
+                </div>
+            </div>
+            <div class="insight-card">
+                <i class="fas fa-id-badge"></i>
+                <div>
+                    <strong id="profileBadge">Explorador</strong>
+                    <span id="profileBadgeDescription">Sigue viajando para desbloquear insignias.</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="preference-panel" id="profilePreferencePanel">
+            <h3>⚙️ Preferencias de viaje</h3>
+            <div class="preference-grid">
+                <label class="preference-toggle">
+                    <input type="checkbox" data-profile-pref="smartMatching" id="prefSmartMatching">
+                    <span>
+                        <strong>Match inteligente</strong>
+                        <small>Recibe sugerencias alineadas a tus horarios favoritos.</small>
+                    </span>
+                </label>
+                <label class="preference-toggle">
+                    <input type="checkbox" data-profile-pref="remindPayment" id="prefRemindPayment">
+                    <span>
+                        <strong>Recordar método de pago</strong>
+                        <small>Guarda tu elección preferida en cada viaje.</small>
+                    </span>
+                </label>
+                <label class="preference-toggle">
+                    <input type="checkbox" data-profile-pref="quietMode" id="prefQuietMode">
+                    <span>
+                        <strong>Modo silencioso</strong>
+                        <small>Recibe notificaciones discretas durante el trayecto.</small>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <form id="updateProfileForm">
+            <div class="profile-photo-container">
+                <img id="profile-pic" src="/img/default_avatar.jpg" alt="Foto de Perfil">
+                <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+                <label for="photo-upload" class="upload-button">
+                    <i class="fas fa-camera"></i>
+                </label>
+            </div>
+
+            <h2 id="profileName">Cargando perfil...</h2>
+            <p id="currentRole" class="role-text"></p>
+
+            <div class="rating-display">
+                <div class="stars">
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                    <i class="fas fa-star"></i>
+                </div>
+                <span id="ratingValue">0.0</span>
+            </div>
+
+            <div class="input-container">
+                <i class="fas fa-user icon"></i>
+                <input type="text" id="name" placeholder="Nombre completo" required>
+            </div>
+
+            <div class="input-container">
+                <i class="fas fa-envelope icon"></i>
+                <input type="email" id="email" placeholder="Correo electrónico" readonly>
+            </div>
+
+            <div class="input-container">
+                <i class="fas fa-phone icon"></i>
+                <input type="tel" id="contactPhone" placeholder="Teléfono WhatsApp (opcional)">
+            </div>
+
+            <div class="field-group">
+                <div class="input-container">
+                    <i class="fas fa-money-bill-wave icon"></i>
+                    <select id="paymentMethod" required>
+                        <option value="">Método de Pago Preferido</option>
+                        <option value="Efectivo">Efectivo</option>
+                        <option value="tarjeta">Transferencia</option>
+                    </select>
+                </div>
+                <div class="input-container">
+                    <i class="fas fa-users-gear icon"></i>
+                    <select id="roleSwitch">
+                        <option value="pasajero">Pasajero</option>
+                        <option value="conductor">Conductor</option>
+                        <option value="administrador">Administrador</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <i class="fas fa-lock icon"></i>
+                <input type="password" id="password" placeholder="Nueva Contraseña (dejar vacío para no cambiar)">
+            </div>
+            <div class="input-container">
+                <i class="fas fa-lock icon"></i>
+                <input type="password" id="confirmPassword" placeholder="Confirmar Contraseña">
+            </div>
+
+            <h3 id="vehicleHeader" style="display:none; margin-top: 20px; color: var(--color-azul);">
+                <i class="fas fa-motorcycle"></i> Datos de la Moto
+            </h3>
+
+            <div id="vehicleFields" style="display:none;">
+                <div class="input-container">
+                    <i class="fas fa-motorcycle icon"></i>
+                    <input type="text" id="marca" placeholder="Marca (ej. Yamaha)">
+                </div>
+                <div class="input-container">
+                    <i class="fas fa-code-fork icon"></i>
+                    <input type="text" id="modelo" placeholder="Modelo (ej. MT-03)">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">
+                <i class="fas fa-save"></i> Guardar Cambios
+            </button>
+        </form>
+
+        <div class="profile-footer">
+            <p>Consejo: activa el modo silencioso antes de exámenes y recibe solo avisos esenciales.</p>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script src="theme.js"></script>
+    <script src="time-sync.js"></script>
+    <script src="config.js"></script>
+    <script src="profile.js"></script>
+
+    <style>
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--color-azul), var(--color-celeste));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+        }
+
+        .profile-card {
+            max-width: 480px;
+            width: 100%;
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.25);
+            color: #fff;
+        }
+
+        .profile-hero {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .profile-hero h1 {
+            font-size: 1.6em;
+            margin-bottom: 6px;
+        }
+
+        .profile-hero p {
+            margin: 0;
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .live-clock-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 0.85em;
+            letter-spacing: 0.4px;
+            margin-top: 6px;
+        }
+
+        .profile-insights {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .insight-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 12px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .insight-card i {
+            font-size: 1.3em;
+            color: var(--color-oro);
+        }
+
+        .insight-card strong {
+            font-size: 1.1em;
+        }
+
+        .insight-card span {
+            font-size: 0.75em;
+            color: rgba(255, 255, 255, 0.75);
+        }
+
+        .preference-panel {
+            margin-bottom: 22px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 18px;
+            border-radius: 18px;
+        }
+
+        .preference-panel h3 {
+            margin-bottom: 12px;
+        }
+
+        .preference-grid {
+            display: grid;
+            gap: 10px;
+        }
+
+        .preference-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            cursor: pointer;
+        }
+
+        .preference-toggle input {
+            width: 18px;
+            height: 18px;
+        }
+
+        .preference-toggle span {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .preference-toggle strong {
+            font-size: 0.9em;
+        }
+
+        .preference-toggle small {
+            font-size: 0.72em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .role-text {
+            color: rgba(255, 255, 255, 0.75);
+            margin-bottom: 18px;
+            font-size: 0.9em;
+        }
+
+        .profile-photo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        .profile-photo-container img {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        }
+
+        .upload-button {
+            margin-top: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px 12px;
+            border-radius: 12px;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .upload-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .rating-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0 18px;
+        }
+
+        .stars {
+            color: #ffd700;
+        }
+
+        .stars i {
+            margin: 0 2px;
+        }
+
+        #ratingValue {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .field-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .field-group .input-container {
+            flex: 1 1 200px;
+        }
+
+        .profile-footer {
+            margin-top: 18px;
+            font-size: 0.8em;
+            color: rgba(255, 255, 255, 0.75);
+            text-align: center;
+        }
+
+        body.dark-mode {
+            background: linear-gradient(135deg, #111, #1e1e1e);
+        }
+
+        body.dark-mode .profile-card {
+            color: #f2f2f2;
+        }
+
+        body.dark-mode .preference-panel,
+        body.dark-mode .insight-card {
+            background: rgba(20, 20, 20, 0.7);
+            border-color: rgba(255, 255, 255, 0.08);
+        }
+
+        body.dark-mode .preference-toggle {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</body>
+</html>
