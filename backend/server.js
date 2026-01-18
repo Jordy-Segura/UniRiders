@@ -2577,5 +2577,5 @@ initializeStatistics();
 setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
 app.listen(API_PORT, () => {
-  console.log(`🚀 Servidor ejecutándose en http://localhost:${API_PORT}`);
+  console.log(`🚀 Servidor ejecutándose en https://uniriders.onrender.com`);
 });

@@ -22,9 +22,9 @@ const transporter = nodemailer.createTransport({
         ciphers: 'SSLv3',
         rejectUnauthorized: false
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+    connectionTimeout: 60000,
+    greetingTimeout: 60000,
+    socketTimeout: 60000
 });
 
 // Cache para controlar envíos
