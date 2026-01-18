@@ -1,17 +1,30 @@
 // 1. IMPORTANTE: Estas dos líneas deben ir SIEMPRE al principio
 require('dotenv').config();
-const sql = require('mssql'); // <-- Esta es la que te faltaba
+const sql = require('mssql');
 
+const {
+  DB_USER,
+  DB_PASSWORD,
+  DB_SERVER,
+  DB_NAME,
+  DB_ENCRYPT,
+  DB_TRUST_CERT
+} = process.env;
+
+if (!DB_USER || !DB_PASSWORD || !DB_SERVER || !DB_NAME) {
+  console.error('❌ Faltan variables de entorno para la base de datos (DB_USER, DB_PASSWORD, DB_SERVER, DB_NAME).');
+  process.exit(1);
+}
 
 const config = {
-    user: 'db_ac3f91_uniridersdb_admin', 
-    password: 'Jordy.2005',  // <--- Escríbela aquí directo
-    server: 'SQL5110.site4now.net',
-    database: 'db_ac3f91_uniridersdb',
-    options: {
-        encrypt: false,
-        trustServerCertificate: true
-    }
+  user: DB_USER,
+  password: DB_PASSWORD,
+  server: DB_SERVER,
+  database: DB_NAME,
+  options: {
+    encrypt: DB_ENCRYPT === 'true',
+    trustServerCertificate: DB_TRUST_CERT !== 'false'
+  }
 };
 
 // 3. Crear el pool de conexión (Esta es la parte que te daba error)
