@@ -1,4 +1,5 @@
 // Agrega estas variables globales al inicio del server.js
+require('dotenv').config();
 const connectedUsers = new Map();
 const typingUsers = new Map();
 const verificationCodes = new Map();
@@ -25,7 +26,7 @@ const upload = multer({
     limits: { fileSize: 2 * 1024 * 1024 }
 });
 
-const API_PORT = 3000;
+const API_PORT = process.env.PORT || 3000;
 
 // Variables globales con datos reales
 const globalTripOffers = [];
@@ -41,7 +42,7 @@ const appStatistics = {
     totalEarnings: 0
 };
 
-const DEFAULT_ADMIN_EMAIL = 'marcelo2005jmsp@gmail.com';
+const DEFAULT_ADMIN_EMAIL = process.env.DEFAULT_ADMIN_EMAIL || 'marcelo2005jmsp@gmail.com';
 const DEFAULT_ADMIN_EMAIL_LOWER = DEFAULT_ADMIN_EMAIL.toLowerCase();
 const DEFAULT_ADMIN_PHONE = process.env.DEFAULT_ADMIN_PHONE || '';
 const CALLMEBOT_API_KEY = process.env.CALLMEBOT_API_KEY || process.env.WHATSAPP_ALERT_API_KEY || null;
@@ -2526,6 +2527,13 @@ initializeStatistics();
 // Actualizar estadísticas periódicamente
 setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${API_PORT}`;
+
 app.listen(API_PORT, () => {
+<<<<<<< HEAD
   console.log(`🚀 Servidor ejecutándose en http://localhost:${API_PORT}`);
 });
+=======
+  console.log(`🚀 Servidor ejecutándose en ${PUBLIC_BASE_URL}`);
+});
+>>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed

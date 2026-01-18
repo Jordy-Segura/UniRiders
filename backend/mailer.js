@@ -1,5 +1,14 @@
 const nodemailer = require("nodemailer");
 
+const {
+    MAIL_HOST,
+    MAIL_PORT,
+    MAIL_SECURE,
+    MAIL_USER,
+    MAIL_PASS,
+    MAIL_FROM
+} = process.env;
+
 function normalizeEmailValue(value) {
     return value ? String(value).trim().toLowerCase() : '';
 }
@@ -9,6 +18,7 @@ function isAllowedRecipient(email) {
     return normalized.endsWith('@espoch.edu.ec');
 }
 
+<<<<<<< HEAD
 // Configuración para Outlook/Office 365 (ESPOCH)
 const transporter = nodemailer.createTransport({
     host: "smtp.office365.com",
@@ -26,22 +36,54 @@ const transporter = nodemailer.createTransport({
     greetingTimeout: 10000,
     socketTimeout: 10000
 });
+=======
+const mailerEnabled = Boolean(MAIL_HOST && MAIL_USER && MAIL_PASS);
+
+// Configuración SMTP vía variables de entorno
+const transporter = mailerEnabled
+    ? nodemailer.createTransport({
+        host: MAIL_HOST,
+        port: MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587,
+        secure: MAIL_SECURE === 'true',
+        auth: {
+            user: MAIL_USER,
+            pass: MAIL_PASS
+        },
+        tls: {
+            ciphers: 'SSLv3',
+            rejectUnauthorized: false
+        },
+        connectionTimeout: 60000,
+        greetingTimeout: 60000,
+        socketTimeout: 60000
+    })
+    : null;
+>>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed
 
 // Cache para controlar envíos
 const recentEmails = new Map();
 const RATE_LIMIT_MS = 30000;
 
 // Verificar configuración del transporter
-transporter.verify(function (error, success) {
-    if (error) {
-        console.log('❌ Error configuración email:', error);
-    } else {
-        console.log('✅ Servidor de correo listo');
-    }
-});
+if (transporter) {
+    transporter.verify(function (error, success) {
+        if (error) {
+            console.log('❌ Error configuración email:', error);
+        } else {
+            console.log('✅ Servidor de correo listo');
+        }
+    });
+} else {
+    console.log('⚠️ Configuración de correo no encontrada. Las notificaciones por email estarán deshabilitadas.');
+}
 
 async function sendRecoveryMail(to, code) {
     try {
+        if (!transporter) {
+            console.log('⚠️ Correo deshabilitado, no se envían notificaciones.');
+            return false;
+        }
+
         // Verificar que sea correo ESPOCH
         if (!isAllowedRecipient(to)) {
             console.log('❌ Correo no autorizado para notificaciones:', to);
@@ -62,7 +104,7 @@ async function sendRecoveryMail(to, code) {
         const mailOptions = {
             from: {
                 name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
+                address: MAIL_FROM || MAIL_USER
             },
             to: to,
             subject: `Código de Verificación UniRiders - ${code}`,
@@ -160,6 +202,11 @@ async function sendAdminLoginMail(to, code) {
     try {
         const normalized = normalizeEmailValue(to);
 
+        if (!transporter) {
+            console.log('⚠️ Correo deshabilitado, no se envían notificaciones.');
+            return false;
+        }
+
         if (!normalized.endsWith('@gmail.com')) {
             console.log('❌ Correo de administrador no válido (debe ser Gmail):', to);
             return false;
@@ -178,7 +225,7 @@ async function sendAdminLoginMail(to, code) {
         const mailOptions = {
             from: {
                 name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
+                address: MAIL_FROM || MAIL_USER
             },
             to,
             subject: `Código de acceso administrador - ${code}`,

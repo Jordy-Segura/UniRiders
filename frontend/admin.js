@@ -1,4 +1,10 @@
+<<<<<<< HEAD
 const API = window.API || "http://localhost:3000/api";
+=======
+const API = window.UNIRIDERS_API_BASE || "http://localhost:3000/api";
+const DEFAULT_ADMIN_EMAIL = 'marcelojmsp@gmail.com';
+const DEFAULT_ADMIN_EMAIL_NORMALIZED = DEFAULT_ADMIN_EMAIL.toLowerCase();
+>>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed
 
 function normalizeEmailValue(value) {
     return value ? value.trim().toLowerCase() : '';

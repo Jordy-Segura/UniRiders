@@ -1,5 +1,9 @@
 (function () {
+<<<<<<< HEAD
     const API_BASE = window.API_BASE_URL || window.UNIRIDERS_API || window.API || "http://localhost:3000/api";
+=======
+    const API_BASE = window.UNIRIDERS_API_BASE || window.API_BASE_URL || window.UNIRIDERS_API || window.API || "http://localhost:3000/api";
+>>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed
     const registeredClocks = new Set();
     let offsetMs = 0;
     let tickInterval = null;
