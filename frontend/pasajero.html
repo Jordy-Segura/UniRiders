@@ -904,7 +904,7 @@
     <script src="theme.js"></script>
     <script src="time-sync.js"></script>
     <script>
-        const API = "http://localhost:3000/api";
+        const API = "/api";
         
         // OBTENER DATOS CON SISTEMA DE SESIONES
         const urlParams = new URLSearchParams(window.location.search);
@@ -1419,7 +1419,7 @@
                 localStorage.removeItem('currentSessionId');
             }
             
-            window.location.href = 'Index.html';
+            window.location.href = 'index.html';
         }
 
         // Lógica de Google Maps embebido

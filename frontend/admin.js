@@ -595,7 +595,7 @@ function attachEventListeners() {
     document.getElementById('adminContactForm').addEventListener('submit', updateAdminContact);
     document.getElementById('logoutBtn').addEventListener('click', () => {
         sessionManager.clearSession();
-        window.location.href = 'Index.html';
+        window.location.href = 'index.html';
     });
     document.getElementById('refreshUsers').addEventListener('click', loadUsers);
     document.getElementById('refreshPricing').addEventListener('click', loadPricing);
@@ -648,7 +648,7 @@ function bootstrapAdminPanel() {
     const role = sessionManager.getSessionData('userRole');
 
     if (!adminEmail || role !== 'administrador') {
-        window.location.href = 'Index.html';
+        window.location.href = 'index.html';
         return;
     }
 

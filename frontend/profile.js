@@ -1,4 +1,4 @@
-const API = "http://localhost:3000/api";
+const API = "/api";
 
 // Obtener datos del usuario
 function getUserData() {
@@ -140,7 +140,7 @@ function updateProfileBadge(totalTrips, rating, role) {
 async function loadProfileData() {
     if (!userEmail) {
         showToast('No se encontró el email. Redirigiendo al login...', false);
-        setTimeout(() => window.location.href = 'Index.html', 3000);
+        setTimeout(() => window.location.href = 'index.html', 3000);
         return;
     }
     

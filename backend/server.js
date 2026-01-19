@@ -1,5 +1,6 @@
 // Agrega estas variables globales al inicio del server.js
 require('dotenv').config();
+console.log("DB_SERVER:", process.env.DB_SERVER);
 
 const connectedUsers = new Map();
 const typingUsers = new Map();
@@ -27,7 +28,8 @@ const upload = multer({
     limits: { fileSize: 2 * 1024 * 1024 }
 });
 
-const API_PORT = 3000;
+const API_PORT = process.env.PORT || 3000;
+
 
 // Variables globales con datos reales
 const globalTripOffers = [];
@@ -2529,4 +2531,6 @@ initializeStatistics();
 setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
+app.listen(API_PORT, () => {
+  console.log(`🚀 Servidor ejecutándose en puerto ${API_PORT}`);
+});

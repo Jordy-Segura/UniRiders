@@ -494,7 +494,7 @@
     <script src="theme.js"></script>
     <script src="time-sync.js"></script>
     <script>
-        const API = "http://localhost:3000/api";
+        const API = "/api";
         
         // Obtener datos de sesión
         const urlParams = new URLSearchParams(window.location.search);
@@ -941,7 +941,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             if (!userEmail || !userRole) {
                 showToast('Sesión no válida. Redirigiendo...', false);
-                setTimeout(() => window.location.href = 'Index.html', 2000);
+                setTimeout(() => window.location.href = 'index.html', 2000);
                 return;
             }
             
