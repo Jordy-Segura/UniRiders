@@ -26,9 +26,18 @@ Ejecuta el script completo antes de iniciar el servidor Node para contar con tod
 Esta guía mantiene sincronizados los datos usando el backend como único punto de acceso a la base de datos.
 
 ### 1) Base de datos (SQL Server gratuito)
-1. Crea una base de datos SQL Server en un proveedor gratuito (ej.: Somee, SQLServerfree o el hosting gratuito que ya uses).
-2. Ejecuta `database/UniRidersDB.sql` en tu servidor para crear tablas, vistas, procedimientos y triggers.
-3. Anota los datos de conexión (usuario, contraseña, servidor y nombre de base).
+1. Si tienes un proveedor gratuito de SQL Server con acceso público, créalo y continúa (ej.: Somee u otro hosting que permita conexiones externas).
+2. Si no tienes proveedor público gratis (o está cerrado), usa un VPS gratuito con **Oracle Cloud Free Tier** y levanta SQL Server Express con Docker:
+   - Crea una VM Always Free (Ubuntu).
+   - Instala Docker.
+   - Ejecuta SQL Server Express:
+     ```bash
+     docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=TuPasswordSegura123' \
+       -p 1433:1433 --name uniriders-sqlserver -d mcr.microsoft.com/mssql/server:2019-latest
+     ```
+   - Abre el puerto 1433 en el firewall de la VM.
+3. Ejecuta `database/UniRidersDB.sql` en tu servidor para crear tablas, vistas, procedimientos y triggers.
+4. Anota los datos de conexión (usuario, contraseña, servidor y nombre de base).
 
 ### 2) Backend gratuito en Render
 1. Crea una cuenta en Render y selecciona **New Web Service**.
