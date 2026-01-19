@@ -1,0 +1,9 @@
+{
+  "name": "uniriders",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backend": "npm --prefix backend start",
+    "dev": "npm --prefix backend run dev"
+  }
+}
