@@ -1,22 +1,24 @@
 # UniRiders
 
-## Base de datos UniRidersDB
+## Base de datos UniRidersDB (PostgreSQL)
 
-En la carpeta `database/` se incluye el script `UniRidersDB.sql` con toda la definición de la nueva base de datos **UniRidersDB**. El script crea las tablas `Usuarios`, `Tarifas`, `Viajes`, `Vehiculos`, `EstadisticasApp`, `HistorialChat` y `EmailVerifications`, junto con índices para los campos consultados con más frecuencia.
+En la carpeta `database/` se incluye el script `UniRidersDB.postgres.sql` con toda la definición de la base de datos **UniRidersDB**. El script crea las tablas `Usuarios`, `Tarifas`, `Viajes`, `Vehiculos`, `EstadisticasApp`, `HistorialChat`, `EmailVerifications` y `AlertasEmergencia`, junto con índices y vistas para los campos consultados con más frecuencia. Si necesitas el esquema original en SQL Server, permanece disponible en `database/UniRidersDB.sql`.
 
-El archivo también define vistas (`vw_Viajes_Detalle`, `vw_Vehiculos_Conductores`), funciones (`fn_TotalIngresos`, `fn_PromedioConductor`), procedimientos almacenados (`sp_Seguro_RegistrarUsuario`, `sp_RegistrarViaje`, `sp_AceptarViaje`, `sp_FinalizarViaje`) y el disparador `trg_ActualizarEstadisticas` que mantiene los totales de la aplicación cada vez que un viaje cambia a estado `finalizado`.
-
-Ejecuta el script completo antes de iniciar el servidor Node para contar con toda la automatización (manejo de excepciones, índices y objetos reutilizables) que usa el backend.
+Ejecuta el script completo antes de iniciar el servidor Node para contar con toda la estructura requerida por el backend.
 
 ---
 
 ## Configuración con variables de entorno (requerido)
 
 1. Crea un archivo `.env` dentro de `backend/` tomando como base `backend/.env.example`.
-2. Completa las variables de base de datos (`DB_USER`, `DB_PASSWORD`, `DB_SERVER`, `DB_NAME`) y, si deseas, las de correo SMTP.
+2. Completa las variables de base de datos PostgreSQL (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL` o `DATABASE_URL`) y, si deseas, las de correo SMTP.
 3. Inicia el backend desde la raíz del repositorio:
    ```bash
-   node server.js
+   npm start
+   ```
+   Para reinicio automático en desarrollo:
+   ```bash
+   npm run dev
    ```
 
 ---
@@ -25,28 +27,19 @@ Ejecuta el script completo antes de iniciar el servidor Node para contar con tod
 
 Esta guía mantiene sincronizados los datos usando el backend como único punto de acceso a la base de datos.
 
-### 1) Base de datos (SQL Server gratuito)
-1. Si tienes un proveedor gratuito de SQL Server con acceso público, créalo y continúa (ej.: Somee u otro hosting que permita conexiones externas).
-2. Si no tienes proveedor público gratis (o está cerrado), usa un VPS gratuito con **Oracle Cloud Free Tier** y levanta SQL Server Express con Docker:
-   - Crea una VM Always Free (Ubuntu).
-   - Instala Docker.
-   - Ejecuta SQL Server Express:
-     ```bash
-     docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=TuPasswordSegura123' \
-       -p 1433:1433 --name uniriders-sqlserver -d mcr.microsoft.com/mssql/server:2019-latest
-     ```
-   - Abre el puerto 1433 en el firewall de la VM.
-3. Ejecuta `database/UniRidersDB.sql` en tu servidor para crear tablas, vistas, procedimientos y triggers.
-4. Anota los datos de conexión (usuario, contraseña, servidor y nombre de base).
+### 1) Base de datos (PostgreSQL gratuito)
+1. Crea una base de datos PostgreSQL gratuita (por ejemplo, en Supabase, Neon, Railway, Render o un VPS propio).
+2. Ejecuta `database/UniRidersDB.postgres.sql` en tu servidor para crear tablas, vistas e índices.
+3. Anota los datos de conexión (host, puerto, usuario, contraseña y nombre de base).
 
 ### 2) Backend gratuito en Render
 1. Crea una cuenta en Render y selecciona **New Web Service**.
 2. Conecta tu repositorio de Git y elige la carpeta raíz del proyecto.
 3. Configura los siguientes valores:
    - **Build Command**: `npm install --prefix backend`
-   - **Start Command**: `node server.js`
+   - **Start Command**: `node backend/server.js`
 4. Agrega variables de entorno desde `backend/.env.example`:
-   - `DB_USER`, `DB_PASSWORD`, `DB_SERVER`, `DB_NAME`
+   - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL` (o `DATABASE_URL`)
    - `MAIL_HOST`, `MAIL_USER`, etc. (opcional)
    - `PUBLIC_BASE_URL` con la URL de Render (ej.: `https://tu-app.onrender.com`)
 5. Despliega y copia la URL pública del backend.
@@ -68,7 +61,7 @@ Esta guía mantiene sincronizados los datos usando el backend como único punto 
 ---
 
 ## Paso a paso resumido
-1. Subir tu SQL Server gratis y ejecutar `database/UniRidersDB.sql`.
+1. Subir tu PostgreSQL gratis y ejecutar `database/UniRidersDB.postgres.sql`.
 2. Configurar y desplegar el backend en Render con las variables de entorno.
 3. Configurar `frontend/config.js` con la URL del backend y desplegar el frontend.
 4. Probar registro/login para confirmar la sincronización de datos.

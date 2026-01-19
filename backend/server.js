@@ -125,61 +125,47 @@ async function ensureAdminInfrastructure() {
         const pool = await poolPromise;
 
         await pool.request().query(`
-            IF COL_LENGTH('Usuarios', 'telefono_whatsapp') IS NULL
-            BEGIN
-                ALTER TABLE Usuarios ADD telefono_whatsapp NVARCHAR(30) NULL;
-            END
+            ALTER TABLE Usuarios
+            ADD COLUMN IF NOT EXISTS telefono_whatsapp VARCHAR(30)
         `);
 
         await pool.request().query(`
-            IF OBJECT_ID('dbo.Tarifas', 'U') IS NULL
-            BEGIN
-                CREATE TABLE Tarifas (
-                    id INT IDENTITY(1,1) PRIMARY KEY,
-                    nombre NVARCHAR(100) NOT NULL,
-                    descripcion NVARCHAR(255) NULL,
-                    precio DECIMAL(10,2) NOT NULL,
-                    activo BIT NOT NULL DEFAULT 1,
-                    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE()
-                );
-            END
+            CREATE TABLE IF NOT EXISTS Tarifas (
+                id SERIAL PRIMARY KEY,
+                nombre VARCHAR(100) NOT NULL,
+                descripcion VARCHAR(255),
+                precio NUMERIC(10,2) NOT NULL,
+                activo BOOLEAN NOT NULL DEFAULT TRUE,
+                fecha_creacion TIMESTAMP NOT NULL DEFAULT NOW()
+            )
         `);
 
         await pool.request().query(`
-            IF OBJECT_ID('dbo.AlertasEmergencia', 'U') IS NULL
-            BEGIN
-                CREATE TABLE AlertasEmergencia (
-                    id INT IDENTITY(1,1) PRIMARY KEY,
-                    usuario_email NVARCHAR(150) NOT NULL,
-                    mensaje NVARCHAR(500) NULL,
-                    ubicacion_lat DECIMAL(10,6) NULL,
-                    ubicacion_lon DECIMAL(10,6) NULL,
-                    trip_id INT NULL,
-                    atendido BIT NOT NULL DEFAULT 0,
-                    fecha DATETIME NOT NULL DEFAULT GETDATE(),
-                    atendido_por NVARCHAR(150) NULL
-                );
-            END
+            CREATE TABLE IF NOT EXISTS AlertasEmergencia (
+                id SERIAL PRIMARY KEY,
+                usuario_email VARCHAR(150) NOT NULL,
+                mensaje VARCHAR(500),
+                ubicacion_lat NUMERIC(10,6),
+                ubicacion_lon NUMERIC(10,6),
+                trip_id INT,
+                atendido BOOLEAN NOT NULL DEFAULT FALSE,
+                fecha TIMESTAMP NOT NULL DEFAULT NOW(),
+                atendido_por VARCHAR(150)
+            )
         `);
 
         await pool.request().query(`
-            IF OBJECT_ID('dbo.Vehiculos', 'U') IS NULL
-            BEGIN
-                CREATE TABLE Vehiculos (
-                    id_vehiculo INT IDENTITY(1,1) PRIMARY KEY,
-                    email_conductor NVARCHAR(150) NOT NULL,
-                    marca NVARCHAR(100) NOT NULL,
-                    modelo NVARCHAR(100) NOT NULL
-                );
-                ALTER TABLE Vehiculos WITH CHECK
-                ADD CONSTRAINT FK_Vehiculos_Usuarios FOREIGN KEY (email_conductor)
-                REFERENCES Usuarios(email);
-            END
+            CREATE TABLE IF NOT EXISTS Vehiculos (
+                id_vehiculo SERIAL PRIMARY KEY,
+                email_conductor VARCHAR(150) NOT NULL REFERENCES Usuarios(email),
+                marca VARCHAR(100) NOT NULL,
+                modelo VARCHAR(100) NOT NULL
+            )
         `);
 
         const adminCheck = await pool.request()
             .input('email', sql.NVarChar, DEFAULT_ADMIN_EMAIL_LOWER)
-            .query(`SELECT TOP 1 nombre, email, rol, telefono_whatsapp FROM Usuarios WHERE LOWER(email) = @email`);
+            .query(`SELECT nombre, email, rol, telefono_whatsapp FROM Usuarios WHERE LOWER(email) = @email LIMIT 1`);
 
         if (adminCheck.recordset.length === 0) {
             const tempPassword = crypto.randomBytes(12).toString('hex');
@@ -233,13 +219,13 @@ async function updateRealTimeStats() {
         // Contar usuarios activos (últimos 5 minutos)
         const activeUsersResult = await pool.request()
             .query(`
-                SELECT COUNT(DISTINCT email) as active_users 
+                SELECT COUNT(DISTINCT email) as active_users
                 FROM (
-                    SELECT pasajero_email as email FROM Viajes 
-                    WHERE fecha_solicitud > DATEADD(MINUTE, -5, GETDATE())
-                    UNION 
-                    SELECT conductor_email as email FROM Viajes 
-                    WHERE fecha_aceptacion > DATEADD(MINUTE, -5, GETDATE())
+                    SELECT pasajero_email as email FROM Viajes
+                    WHERE fecha_solicitud > NOW() - INTERVAL '5 minutes'
+                    UNION
+                    SELECT conductor_email as email FROM Viajes
+                    WHERE fecha_aceptacion > NOW() - INTERVAL '5 minutes'
                 ) as usuarios_activos
             `);
         
@@ -253,7 +239,7 @@ async function updateRealTimeStats() {
         
         // Contar viajes completados hoy
         const completedTodayResult = await pool.request()
-            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'finalizado' AND CAST(fecha_finalizacion AS DATE) = CAST(GETDATE() AS DATE)");
+            .query("SELECT COUNT(*) as completed_today FROM Viajes WHERE estado = 'finalizado' AND DATE(fecha_finalizacion) = CURRENT_DATE");
         
         const completedToday = completedTodayResult.recordset[0]?.completed_today || 0;
         
@@ -264,8 +250,8 @@ async function updateRealTimeStats() {
                 usuarios_activos = ${activeUsers},
                 viajes_activos = ${activeTrips},
                 viajes_completados = (SELECT COUNT(*) FROM Viajes WHERE estado = 'finalizado'),
-                ingresos_totales = (SELECT dbo.fn_TotalIngresos()),
-                fecha_reporte = CAST(GETDATE() AS DATE)
+                ingresos_totales = (SELECT COALESCE(SUM(costo), 0) FROM Viajes WHERE estado = 'finalizado'),
+                fecha_reporte = CURRENT_DATE
             `);
 
         return { activeUsers, activeTrips, completedToday, syncedAt: new Date().toISOString() };
@@ -288,13 +274,16 @@ async function getTripHistory(email, role) {
         const pool = await poolPromise;
         const filterColumn = role === 'conductor' ? 'v.conductor_email' : 'v.pasajero_email';
         const historyQuery = `
-            SELECT TOP 10 d.id_viaje, d.pasajero_email, d.conductor_email, d.origen, d.destino,
-                   d.estado, d.costo, d.metodo_pago, d.fecha_solicitud, d.fecha_aceptacion,
-                   d.fecha_finalizacion, d.pasajero, d.conductor, d.tarifa
-            FROM vw_Viajes_Detalle d
-            INNER JOIN Viajes v ON v.id_viaje = d.id_viaje
+            SELECT v.id_viaje, v.pasajero_email, v.conductor_email, v.origen, v.destino,
+                   v.estado, v.costo, v.metodo_pago, v.fecha_solicitud, v.fecha_aceptacion,
+                   v.fecha_finalizacion, p.nombre AS pasajero, c.nombre AS conductor, t.nombre AS tarifa
+            FROM Viajes v
+            INNER JOIN Usuarios p ON v.pasajero_email = p.email
+            LEFT JOIN Usuarios c ON v.conductor_email = c.email
+            INNER JOIN Tarifas t ON v.id_tarifa = t.id
             WHERE LOWER(${filterColumn}) = @email
-            ORDER BY d.fecha_solicitud DESC
+            ORDER BY v.fecha_solicitud DESC
+            LIMIT 10
         `;
 
         const result = await pool.request()
@@ -331,7 +320,7 @@ async function initializeStatistics() {
         
         try {
             const earningsResult = await pool.request()
-                .query("SELECT dbo.fn_TotalIngresos() as totalEarnings");
+                .query("SELECT COALESCE(SUM(costo), 0) as totalEarnings FROM Viajes WHERE estado = 'finalizado'");
             appStatistics.totalEarnings = earningsResult.recordset[0].totalEarnings || 0;
         } catch (err) {
             // Si no existe la columna costo, calcular basado en viajes completados
@@ -394,10 +383,11 @@ async function getDefaultTariffId() {
     try {
         const pool = await poolPromise;
         const tariffResult = await pool.request().query(`
-            SELECT TOP 1 id
+            SELECT id
             FROM Tarifas
-            WHERE activo = 1
+            WHERE activo = TRUE
             ORDER BY precio ASC, id ASC
+            LIMIT 1
         `);
 
         if (tariffResult.recordset.length) {
@@ -526,7 +516,10 @@ app.post("/api/verify-registration", async (req, res) => {
             .input("email", sql.NVarChar, normalizedEmail)
             .input("password", sql.NVarChar, hashedPassword)
             .input("rol", sql.NVarChar, role)
-            .execute('sp_Seguro_RegistrarUsuario');
+            .query(`
+                INSERT INTO Usuarios (nombre, email, password, rol, creado_en)
+                VALUES (@nombre, @email, @password, @rol, NOW())
+            `);
 
         await pool.request()
             .input("email", sql.NVarChar, normalizedEmail)
@@ -966,7 +959,7 @@ app.post("/api/admin/pricing", requireAdmin, async (req, res) => {
             .input("nombre", sql.NVarChar, nombre)
             .input("descripcion", sql.NVarChar, descripcion || null)
             .input("precio", sql.Decimal(10,2), parseFloat(precio))
-            .input("activo", sql.Bit, activo ? 1 : 0)
+            .input("activo", sql.Bit, Boolean(activo))
             .query(`
                 INSERT INTO Tarifas (nombre, descripcion, precio, activo)
                 VALUES (@nombre, @descripcion, @precio, @activo)
@@ -1008,7 +1001,7 @@ app.put("/api/admin/pricing/:id", requireAdmin, async (req, res) => {
 
         if (activo !== undefined) {
             updates.push("activo = @activo");
-            request.input("activo", sql.Bit, activo ? 1 : 0);
+            request.input("activo", sql.Bit, Boolean(activo));
         }
 
         if (!updates.length) {
@@ -1226,7 +1219,7 @@ app.get("/api/stats/overview", async (req, res) => {
         const totalUsers = totalUsersResult.recordset[0]?.total_users || 0;
 
         const earningsResult = await pool.request()
-            .query("SELECT dbo.fn_TotalIngresos() as total_earnings");
+            .query("SELECT COALESCE(SUM(costo), 0) as total_earnings FROM Viajes WHERE estado = 'finalizado'");
 
         const completedResult = await pool.request()
             .query("SELECT COUNT(*) as completed_trips FROM Viajes WHERE estado = 'finalizado'");
@@ -1256,7 +1249,7 @@ app.get("/api/stats/overview", async (req, res) => {
 app.get("/api/system/time", async (req, res) => {
     try {
         const pool = await poolPromise;
-        const result = await pool.request().query("SELECT SYSDATETIMEOFFSET() AS serverTime");
+        const result = await pool.request().query("SELECT CURRENT_TIMESTAMP AS serverTime");
         const serverTime = result.recordset[0]?.serverTime || new Date().toISOString();
         res.json({
             serverTime,
@@ -1406,7 +1399,29 @@ app.post("/api/trips/request", async (req, res) => {
             .input("origen", sql.NVarChar, origin)
             .input("destino", sql.NVarChar, destination)
             .input("metodo_pago", sql.NVarChar, paymentMethod || 'Efectivo')
-            .execute('sp_RegistrarViaje');
+            .query(`
+                INSERT INTO Viajes (
+                    pasajero_email,
+                    conductor_email,
+                    id_tarifa,
+                    origen,
+                    destino,
+                    estado,
+                    metodo_pago,
+                    fecha_solicitud
+                )
+                VALUES (
+                    @pasajero_email,
+                    @conductor_email,
+                    @id_tarifa,
+                    @origen,
+                    @destino,
+                    'pendiente',
+                    @metodo_pago,
+                    NOW()
+                )
+                RETURNING id_viaje
+            `);
 
         if (result.recordset?.length) {
             newTrip.id = result.recordset[0].id_viaje;
@@ -1486,7 +1501,12 @@ app.post("/api/trips/accept", async (req, res) => {
 
             await pool.request()
                 .input("id_viaje", sql.Int, numericTripId)
-                .execute('sp_AceptarViaje');
+                .query(`
+                    UPDATE Viajes
+                    SET estado = 'aceptado',
+                        fecha_aceptacion = NOW()
+                    WHERE id_viaje = @id_viaje
+                `);
         } catch (dbErr) {
             console.log('Error actualizando viaje en BD:', dbErr);
         }
@@ -1668,7 +1688,17 @@ app.post("/api/trips/complete", async (req, res) => {
                 .input("calif_conductor", sql.Decimal(5,2), null)
                 .input("coment_p", sql.NVarChar, null)
                 .input("coment_c", sql.NVarChar, null)
-                .execute('sp_FinalizarViaje');
+                .query(`
+                    UPDATE Viajes
+                    SET estado = 'finalizado',
+                        costo = @costo,
+                        fecha_finalizacion = NOW(),
+                        calificacion_pasajero = @calif_pasajero,
+                        calificacion_conductor = @calif_conductor,
+                        comentario_pasajero = @coment_p,
+                        comentario_conductor = @coment_c
+                    WHERE id_viaje = @id_viaje
+                `);
         } catch (dbErr) {
             console.log('Error guardando viaje en BD:', dbErr);
         }
@@ -2068,12 +2098,20 @@ app.get("/api/profile/:email", async (req, res) => {
         if (userData.rol === 'conductor') {
             const ratingResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query("SELECT dbo.fn_PromedioConductor(@email) as avgRating");
+                .query(`
+                    SELECT COALESCE(AVG(calificacion_conductor), 0) as avgRating
+                    FROM Viajes
+                    WHERE conductor_email = @email AND calificacion_conductor IS NOT NULL
+                `);
             ratingValue = ratingResult.recordset[0]?.avgRating || 0;
         } else {
             const ratingResult = await pool.request()
                 .input("email", sql.NVarChar, normalizedEmail)
-                .query(`SELECT AVG(CAST(calificacion_pasajero AS FLOAT)) as avgRating FROM Viajes WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL`);
+                .query(`
+                    SELECT COALESCE(AVG(calificacion_pasajero), 0) as avgRating
+                    FROM Viajes
+                    WHERE LOWER(pasajero_email) = @email AND calificacion_pasajero IS NOT NULL
+                `);
             ratingValue = ratingResult.recordset[0]?.avgRating || 0;
         }
 
