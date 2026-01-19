@@ -18,7 +18,6 @@ function isAllowedRecipient(email) {
     return normalized.endsWith('@espoch.edu.ec');
 }
 
-<<<<<<< HEAD
 // Configuración para Outlook/Office 365 (ESPOCH)
 const transporter = nodemailer.createTransport({
     host: "smtp.office365.com",
@@ -36,29 +35,6 @@ const transporter = nodemailer.createTransport({
     greetingTimeout: 10000,
     socketTimeout: 10000
 });
-=======
-const mailerEnabled = Boolean(MAIL_HOST && MAIL_USER && MAIL_PASS);
-
-// Configuración SMTP vía variables de entorno
-const transporter = mailerEnabled
-    ? nodemailer.createTransport({
-        host: MAIL_HOST,
-        port: MAIL_PORT ? parseInt(MAIL_PORT, 10) : 587,
-        secure: MAIL_SECURE === 'true',
-        auth: {
-            user: MAIL_USER,
-            pass: MAIL_PASS
-        },
-        tls: {
-            ciphers: 'SSLv3',
-            rejectUnauthorized: false
-        },
-        connectionTimeout: 60000,
-        greetingTimeout: 60000,
-        socketTimeout: 60000
-    })
-    : null;
->>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed
 
 // Cache para controlar envíos
 const recentEmails = new Map();

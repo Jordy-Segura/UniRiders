@@ -2530,10 +2530,5 @@ setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || `http://localhost:${API_PORT}`;
 
 app.listen(API_PORT, () => {
-<<<<<<< HEAD
   console.log(`🚀 Servidor ejecutándose en http://localhost:${API_PORT}`);
 });
-=======
-  console.log(`🚀 Servidor ejecutándose en ${PUBLIC_BASE_URL}`);
-});
->>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed

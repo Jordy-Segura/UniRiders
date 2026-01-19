@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 const API = "http://localhost:3000/api";
-=======
-const API = window.UNIRIDERS_API_BASE || "http://localhost:3000/api";
->>>>>>> 11713c5b9db2c881a1630ad823cc454f9912f9ed
 
 // Obtener datos del usuario
 function getUserData() {
