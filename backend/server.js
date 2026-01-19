@@ -1,4 +1,6 @@
 // Agrega estas variables globales al inicio del server.js
+require('dotenv').config();
+
 const connectedUsers = new Map();
 const typingUsers = new Map();
 const verificationCodes = new Map();
@@ -2526,6 +2528,5 @@ initializeStatistics();
 // Actualizar estadísticas periódicamente
 setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
-app.listen(API_PORT, () => {
-  console.log(`🚀 Servidor ejecutándose en http://localhost:${API_PORT}`);
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Servidor corriendo en puerto ${PORT}`));
