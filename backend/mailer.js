@@ -1,14 +1,5 @@
 const nodemailer = require("nodemailer");
 
-const {
-    MAIL_HOST,
-    MAIL_PORT,
-    MAIL_SECURE,
-    MAIL_USER,
-    MAIL_PASS,
-    MAIL_FROM
-} = process.env;
-
 function normalizeEmailValue(value) {
     return value ? String(value).trim().toLowerCase() : '';
 }
@@ -41,25 +32,16 @@ const recentEmails = new Map();
 const RATE_LIMIT_MS = 30000;
 
 // Verificar configuración del transporter
-if (transporter) {
-    transporter.verify(function (error, success) {
-        if (error) {
-            console.log('❌ Error configuración email:', error);
-        } else {
-            console.log('✅ Servidor de correo listo');
-        }
-    });
-} else {
-    console.log('⚠️ Configuración de correo no encontrada. Las notificaciones por email estarán deshabilitadas.');
-}
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log('❌ Error configuración email:', error);
+    } else {
+        console.log('✅ Servidor de correo listo');
+    }
+});
 
 async function sendRecoveryMail(to, code) {
     try {
-        if (!transporter) {
-            console.log('⚠️ Correo deshabilitado, no se envían notificaciones.');
-            return false;
-        }
-
         // Verificar que sea correo ESPOCH
         if (!isAllowedRecipient(to)) {
             console.log('❌ Correo no autorizado para notificaciones:', to);
@@ -80,7 +62,7 @@ async function sendRecoveryMail(to, code) {
         const mailOptions = {
             from: {
                 name: 'UniRiders ESPOCH',
-                address: MAIL_FROM || MAIL_USER
+                address: 'jordy.segura@espoch.edu.ec'
             },
             to: to,
             subject: `Código de Verificación UniRiders - ${code}`,
@@ -178,11 +160,6 @@ async function sendAdminLoginMail(to, code) {
     try {
         const normalized = normalizeEmailValue(to);
 
-        if (!transporter) {
-            console.log('⚠️ Correo deshabilitado, no se envían notificaciones.');
-            return false;
-        }
-
         if (!normalized.endsWith('@gmail.com')) {
             console.log('❌ Correo de administrador no válido (debe ser Gmail):', to);
             return false;
@@ -201,7 +178,7 @@ async function sendAdminLoginMail(to, code) {
         const mailOptions = {
             from: {
                 name: 'UniRiders ESPOCH',
-                address: MAIL_FROM || MAIL_USER
+                address: 'jordy.segura@espoch.edu.ec'
             },
             to,
             subject: `Código de acceso administrador - ${code}`,
