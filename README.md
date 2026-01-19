@@ -16,7 +16,11 @@ Ejecuta el script completo antes de iniciar el servidor Node para contar con tod
 2. Completa las variables de base de datos (`DB_USER`, `DB_PASSWORD`, `DB_SERVER`, `DB_NAME`) y, si deseas, las de correo SMTP.
 3. Inicia el backend desde la raíz del repositorio:
    ```bash
-   node server.js
+   npm start
+   ```
+   Para reinicio automático en desarrollo:
+   ```bash
+   npm run dev
    ```
 
 ---
@@ -44,7 +48,7 @@ Esta guía mantiene sincronizados los datos usando el backend como único punto 
 2. Conecta tu repositorio de Git y elige la carpeta raíz del proyecto.
 3. Configura los siguientes valores:
    - **Build Command**: `npm install --prefix backend`
-   - **Start Command**: `node server.js`
+   - **Start Command**: `node backend/server.js`
 4. Agrega variables de entorno desde `backend/.env.example`:
    - `DB_USER`, `DB_PASSWORD`, `DB_SERVER`, `DB_NAME`
    - `MAIL_HOST`, `MAIL_USER`, etc. (opcional)
