@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "backend": "npm --prefix backend start",
-    "dev": "npm --prefix backend run dev"
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js",
+    "backend": "node backend/server.js"
   }
 }
