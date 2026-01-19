@@ -1,5 +1,5 @@
 (function () {
-    const API_BASE = window.API_BASE_URL || window.UNIRIDERS_API || window.API || "https://uni-riders.vercel.app/";
+    const API_BASE = window.UNIRIDERS_API_BASE || window.API_BASE_URL || window.UNIRIDERS_API || window.API || "http://localhost:3000/api";
     const registeredClocks = new Set();
     let offsetMs = 0;
     let tickInterval = null;

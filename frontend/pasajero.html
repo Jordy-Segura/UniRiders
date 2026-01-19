@@ -6,6 +6,7 @@
     <title>UniRiders - Pasajero Premium 👤</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="config.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     
     <style>
@@ -904,7 +905,7 @@
     <script src="theme.js"></script>
     <script src="time-sync.js"></script>
     <script>
-        const API = "http://localhost:3000/api";
+        const API = window.UNIRIDERS_API_BASE || "http://localhost:3000/api";
         
         // OBTENER DATOS CON SISTEMA DE SESIONES
         const urlParams = new URLSearchParams(window.location.search);
@@ -1387,7 +1388,7 @@
             
             if (userEmail && passengerProfilePic) {
                 const timestamp = new Date().getTime();
-                passengerProfilePic.src = `http://localhost:3000/api/profile/${userEmail}/photo?t=${timestamp}`;
+                passengerProfilePic.src = `${API}/profile/${userEmail}/photo?t=${timestamp}`;
             }
         }
 

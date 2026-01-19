@@ -1,4 +1,4 @@
-const API = "https://uni-riders.vercel.app/";
+const API = window.UNIRIDERS_API_BASE || "http://localhost:3000/api";
 
 // Obtener datos del usuario
 function getUserData() {
