@@ -293,8 +293,8 @@
                 <div style="margin: 15px 0;">
                     <label style="color: #666; font-size: 0.8em;">
                         <input type="checkbox" id="acceptTerms" required>
-                        Acepto los <a href="terms.html" style="color: #0072ff;" target="_blank" rel="noopener">términos de servicio</a> y
-                        <a href="privacy.html" style="color: #0072ff;" target="_blank" rel="noopener">política de privacidad</a>
+                        Acepto los <a href="#" class="legal-link" data-legal="terms">términos de servicio</a> y
+                        <a href="#" class="legal-link" data-legal="privacy">política de privacidad</a>
                     </label>
                     <p style="margin-top: 8px; font-size: 0.75em; color: #777;">
                         ✔️ Uso responsable del servicio &nbsp;•&nbsp; ✔️ Cuidado de datos personales &nbsp;•&nbsp; ✔️ Normas de convivencia.
@@ -379,6 +379,12 @@
     </main>
 
     <div id="toast" class="toast"></div>
+    <div id="legalModal" class="legal-modal" aria-hidden="true" role="dialog">
+        <div class="legal-modal__content" role="document">
+            <button class="legal-modal__close" type="button" aria-label="Cerrar">✕</button>
+            <div class="legal-modal__body" data-legal-content></div>
+        </div>
+    </div>
 
     <script src="theme.js"></script>
     <script src="time-sync.js"></script>

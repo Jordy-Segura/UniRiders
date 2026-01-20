@@ -450,6 +450,87 @@ if (adminVerifyCodeBtn) {
   });
 }
 
+const legalModal = document.getElementById("legalModal");
+const legalModalContent = legalModal?.querySelector("[data-legal-content]");
+const legalModalClose = legalModal?.querySelector(".legal-modal__close");
+const legalLinks = document.querySelectorAll(".legal-link");
+
+const legalCopy = {
+  terms: `
+    <h1>Términos de Servicio</h1>
+    <p>Última actualización: 20 de enero de 2026</p>
+    <h2>1. Aceptación</h2>
+    <p>Al crear una cuenta en UniRiders aceptas estos términos y te comprometes a respetar las normas de la comunidad ESPOCH.</p>
+    <h2>2. Uso permitido</h2>
+    <ul>
+      <li>Usar información real y mantener tu perfil actualizado.</li>
+      <li>Negociar tarifas de manera clara y respetuosa.</li>
+      <li>No usar la plataforma para actividades ilegales o peligrosas.</li>
+    </ul>
+    <h2>3. Tarifas y pagos</h2>
+    <p>Las tarifas se acuerdan entre pasajero y conductor. UniRiders no procesa pagos directos ni interviene en la negociación final.</p>
+    <h2>4. Seguridad y convivencia</h2>
+    <p>Todos los usuarios deben cumplir las normas de tránsito, usar casco y priorizar la seguridad. Comportamientos agresivos pueden causar suspensión.</p>
+    <h2>5. Suspensión de cuentas</h2>
+    <p>UniRiders puede suspender cuentas por fraude, suplantación, reportes reiterados o incumplimiento de estos términos.</p>
+    <h2>6. Cambios</h2>
+    <p>Podemos actualizar estos términos y notificaremos los cambios relevantes dentro de la plataforma.</p>
+  `,
+  privacy: `
+    <h1>Política de Privacidad</h1>
+    <p>Última actualización: 20 de enero de 2026</p>
+    <h2>1. Información recopilada</h2>
+    <p>Recolectamos datos de cuenta (nombre, correo institucional, rol), datos de viaje y mensajes necesarios para coordinar el servicio.</p>
+    <h2>2. Uso de la información</h2>
+    <ul>
+      <li>Coordinar solicitudes, ofertas y contraofertas.</li>
+      <li>Mejorar la seguridad, soporte y calidad del servicio.</li>
+      <li>Generar estadísticas operativas internas.</li>
+    </ul>
+    <h2>3. Compartición</h2>
+    <p>No vendemos tus datos. Solo compartimos información básica necesaria para completar un viaje entre pasajero y conductor.</p>
+    <h2>4. Seguridad</h2>
+    <p>Aplicamos medidas técnicas y organizativas para proteger tu información. Sin embargo, ningún sistema es 100% infalible.</p>
+    <h2>5. Tus derechos</h2>
+    <p>Puedes solicitar actualización o eliminación de tu información mediante los canales oficiales de soporte.</p>
+  `
+};
+
+function openLegalModal(type) {
+  if (!legalModal || !legalModalContent) return;
+  legalModalContent.innerHTML = legalCopy[type] || "";
+  legalModal.classList.add("is-open");
+  legalModal.setAttribute("aria-hidden", "false");
+}
+
+function closeLegalModal() {
+  if (!legalModal) return;
+  legalModal.classList.remove("is-open");
+  legalModal.setAttribute("aria-hidden", "true");
+}
+
+legalLinks.forEach(link => {
+  link.addEventListener("click", (event) => {
+    event.preventDefault();
+    const type = link.dataset.legal;
+    openLegalModal(type);
+  });
+});
+
+if (legalModalClose) {
+  legalModalClose.addEventListener("click", closeLegalModal);
+}
+
+if (legalModal) {
+  legalModal.addEventListener("click", (event) => {
+    if (event.target === legalModal) closeLegalModal();
+  });
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeLegalModal();
+});
+
 // Recuperar contraseña: restablecer
 resetPassBtn.addEventListener("click", async () => {
   const email = document.getElementById("recEmail").value.trim();
