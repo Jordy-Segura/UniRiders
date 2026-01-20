@@ -1421,6 +1421,16 @@ app.post("/api/trips/request", async (req, res) => {
 
         if (result.recordset?.length) {
             newTrip.id = result.recordset[0].id_viaje;
+            if (fareValue !== null) {
+                await pool.request()
+                    .input("tripId", sql.Int, newTrip.id)
+                    .input("costo", sql.Decimal(10, 2), fareValue)
+                    .query(`
+                        UPDATE Viajes
+                        SET costo = @costo
+                        WHERE id_viaje = @tripId
+                    `);
+            }
         } else {
             return res.status(500).json({ message: "No se pudo registrar el viaje" });
         }

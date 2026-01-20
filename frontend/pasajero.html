@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
     
     <style>
         /* Estilos específicos de la aplicación de Pasajero */
@@ -840,6 +841,20 @@
             <button class="search-btn" id="requestRideBtn">🚀 Solicitar Viaje Premium</button>
         </div>
 
+        <div class="map-picker">
+            <div class="map-picker__header">
+                <h4>🗺️ Selecciona origen y destino en el mapa</h4>
+                <p class="body-note">Toca el mapa para fijar puntos, como en InDrive.</p>
+            </div>
+            <div class="map-picker__actions">
+                <button type="button" class="search-btn map-picker__btn" data-map-mode="origin">📍 Elegir origen</button>
+                <button type="button" class="search-btn map-picker__btn map-picker__btn--secondary" data-map-mode="destination">🏁 Elegir destino</button>
+                <button type="button" class="search-btn map-picker__btn map-picker__btn--ghost" id="clearMapSelection">🧹 Limpiar</button>
+            </div>
+            <div id="pickupMap" class="map-picker__map" aria-label="Mapa para selección de origen y destino"></div>
+            <div class="map-picker__summary" id="mapSelectionStatus">Selecciona un modo y toca el mapa para elegir el punto.</div>
+        </div>
+
         <div class="message-area" id="messageArea">
             💫 Ingresa tu destino y viaja con los mejores conductores
         </div>
@@ -903,6 +918,7 @@
     <div id="toast" class="toast"></div>
 
     <script src="theme.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="time-sync.js"></script>
     <script>
         const API = "/api";
@@ -928,10 +944,16 @@
         const shareLocationContainer = document.getElementById('shareLocationContainer');
         const shareLocationBtn = document.getElementById('shareLocationBtn');
         const passengerLocationStatus = document.getElementById('passengerLocationStatus');
+        const mapPickerStatus = document.getElementById('mapSelectionStatus');
+        const mapPickerButtons = document.querySelectorAll('[data-map-mode]');
+        const clearMapSelectionBtn = document.getElementById('clearMapSelection');
         let currentTripId = null;
         let currentFareOffer = null;
         let currentTripOrigin = null;
         let currentTripDestination = null;
+        let mapPickerMode = 'origin';
+        let originMarker = null;
+        let destinationMarker = null;
         const loyaltyProgressIndicator = document.getElementById('loyaltyProgressIndicator');
         const loyaltyTripsLabel = document.getElementById('loyaltyTrips');
         const loyaltyTagline = document.getElementById('loyaltyTagline');
@@ -988,6 +1010,103 @@
         });
 
         updateMoodMessage();
+
+        function formatCoordinateLabel(label, coords) {
+            if (!coords) return `${label}: pendiente`;
+            return `${label}: ${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
+        }
+
+        function updateMapPickerStatus(originCoords, destinationCoords) {
+            if (!mapPickerStatus) return;
+            mapPickerStatus.textContent = `${formatCoordinateLabel('Origen', originCoords)} · ${formatCoordinateLabel('Destino', destinationCoords)}`;
+        }
+
+        function setMapPickerMode(mode) {
+            mapPickerMode = mode;
+            mapPickerButtons.forEach(button => {
+                button.classList.toggle('map-picker__btn--active', button.dataset.mapMode === mode);
+            });
+            if (mapPickerStatus) {
+                mapPickerStatus.textContent = mode === 'origin'
+                    ? 'Selecciona el origen tocando el mapa.'
+                    : 'Selecciona el destino tocando el mapa.';
+            }
+        }
+
+        function initMapPicker() {
+            const mapContainer = document.getElementById('pickupMap');
+            if (!mapContainer || typeof L === 'undefined') return;
+
+            const map = L.map(mapContainer, { zoomControl: false }).setView([-1.65, -78.68], 13);
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            const updateInputs = () => {
+                if (originMarker) {
+                    const coords = originMarker.getLatLng();
+                    currentTripOrigin = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+                    document.getElementById('origen').value = currentTripOrigin;
+                }
+                if (destinationMarker) {
+                    const coords = destinationMarker.getLatLng();
+                    currentTripDestination = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+                    document.getElementById('destino').value = currentTripDestination;
+                }
+                updateMapPickerStatus(
+                    originMarker ? originMarker.getLatLng() : null,
+                    destinationMarker ? destinationMarker.getLatLng() : null
+                );
+            };
+
+            map.on('click', (event) => {
+                if (mapPickerMode === 'origin') {
+                    if (originMarker) {
+                        originMarker.setLatLng(event.latlng);
+                    } else {
+                        originMarker = L.marker(event.latlng, { draggable: true }).addTo(map);
+                        originMarker.on('dragend', updateInputs);
+                    }
+                } else {
+                    if (destinationMarker) {
+                        destinationMarker.setLatLng(event.latlng);
+                    } else {
+                        destinationMarker = L.marker(event.latlng, { draggable: true }).addTo(map);
+                        destinationMarker.on('dragend', updateInputs);
+                    }
+                }
+                updateInputs();
+            });
+
+            mapPickerButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    setMapPickerMode(button.dataset.mapMode);
+                });
+            });
+
+            if (clearMapSelectionBtn) {
+                clearMapSelectionBtn.addEventListener('click', () => {
+                    if (originMarker) {
+                        map.removeLayer(originMarker);
+                        originMarker = null;
+                    }
+                    if (destinationMarker) {
+                        map.removeLayer(destinationMarker);
+                        destinationMarker = null;
+                    }
+                    currentTripOrigin = null;
+                    currentTripDestination = null;
+                    document.getElementById('origen').value = '';
+                    document.getElementById('destino').value = '';
+                    updateMapPickerStatus(null, null);
+                });
+            }
+
+            setMapPickerMode('origin');
+            updateMapPickerStatus(null, null);
+        }
 
         function updateLoyaltyProgress(completedTrips = 0) {
             if (!loyaltyProgressIndicator || !loyaltyTripsLabel || !loyaltyTagline) return;
@@ -2120,6 +2239,7 @@
         // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
             initMap();
+            initMapPicker();
             loadPassengerProfilePhoto();
             setupVoiceRecognition();
             // Reanudar viaje, historial, etc...
