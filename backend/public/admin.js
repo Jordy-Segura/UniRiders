@@ -752,7 +752,7 @@ function bootstrapAdminPanel() {
     refreshAdminStats();
 
     setInterval(loadEmergencies, 20000);
-    adminStatsInterval = setInterval(refreshAdminStats, 15000);
+    adminStatsInterval = setInterval(refreshAdminStats, 10000);
 }
 
 document.addEventListener('DOMContentLoaded', bootstrapAdminPanel);

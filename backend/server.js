@@ -1424,6 +1424,99 @@ app.get("/api/trips/history", async (req, res) => {
     }
 });
 
+app.delete("/api/trips/history/clear", async (req, res) => {
+    const userEmail = req.headers['user-email'];
+    const userRole = req.headers['user-role'];
+
+    if (!userEmail || !userRole) {
+        return res.status(400).json({ message: "Datos de usuario requeridos" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("email", sql.NVarChar, normalizeEmail(userEmail));
+
+        await request.query(`
+            DELETE FROM HistorialChat
+            WHERE id_viaje IN (
+                SELECT id_viaje FROM Viajes
+                WHERE (pasajero_email = @email OR conductor_email = @email)
+                AND estado IN ('finalizado', 'cancelado')
+            )
+        `);
+        const result = await request.query(`
+            DELETE FROM Viajes
+            WHERE (pasajero_email = @email OR conductor_email = @email)
+            AND estado IN ('finalizado', 'cancelado')
+        `);
+
+        await transaction.commit();
+        const removed = result.rowsAffected[0] || 0;
+        res.json({ message: `Historial eliminado (${removed} viajes)` });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar historial" });
+    }
+});
+
+app.delete("/api/trips/:id", async (req, res) => {
+    const tripId = parseInt(req.params.id, 10);
+    const userEmail = req.headers['user-email'];
+    const userRole = req.headers['user-role'];
+
+    if (!userEmail || !userRole) {
+        return res.status(400).json({ message: "Datos de usuario requeridos" });
+    }
+    if (Number.isNaN(tripId)) {
+        return res.status(400).json({ message: "Viaje inválido" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const tripLookup = await pool.request()
+            .input("tripId", sql.Int, tripId)
+            .query(`
+                SELECT pasajero_email, conductor_email, estado
+                FROM Viajes
+                WHERE id_viaje = @tripId
+            `);
+
+        if (tripLookup.recordset.length === 0) {
+            return res.status(404).json({ message: "Viaje no encontrado" });
+        }
+
+        const trip = tripLookup.recordset[0];
+        const normalizedEmail = normalizeEmail(userEmail);
+        const ownerMatch = normalizeEmail(trip.pasajero_email) === normalizedEmail
+            || normalizeEmail(trip.conductor_email) === normalizedEmail;
+
+        if (!ownerMatch) {
+            return res.status(403).json({ message: "No autorizado para eliminar este viaje" });
+        }
+
+        if (!['finalizado', 'cancelado'].includes(String(trip.estado || '').toLowerCase())) {
+            return res.status(400).json({ message: "Solo se pueden eliminar viajes finalizados o cancelados" });
+        }
+
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("tripId", sql.Int, tripId);
+
+        await request.query("DELETE FROM HistorialChat WHERE id_viaje = @tripId");
+        await request.query("DELETE FROM Viajes WHERE id_viaje = @tripId");
+
+        await transaction.commit();
+        res.json({ message: "Viaje eliminado del historial" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar viaje" });
+    }
+});
+
 // Ruta para obtener historial de chat de un viaje
 app.get("/api/chat/:tripId/history", async (req, res) => {
     const tripId = req.params.tripId;

@@ -113,6 +113,43 @@
             background: rgba(255, 255, 255, 0.2);
         }
 
+        .history-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+
+        .danger-btn {
+            background: #ef4444;
+            border: none;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .danger-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px -12px rgba(239, 68, 68, 0.6);
+        }
+
+        .danger-btn.small-btn {
+            padding: 6px 10px;
+            font-size: 0.85em;
+        }
+
+        .trip-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
         .header h1 {
             font-size: 1.8em;
             margin: 0;
@@ -440,6 +477,11 @@
                 <h1><i class="fas fa-history"></i> Mis Últimos Viajes</h1>
                 <span class="live-clock-chip" id="historyLiveClock" data-live-clock>--:--:--</span>
             </div>
+            <div class="history-actions">
+                <button class="danger-btn" id="clearHistoryBtn">
+                    <i class="fas fa-trash"></i> Eliminar historial
+                </button>
+            </div>
         </div>
 
         <div class="summary-cards" id="historySummary">
@@ -504,6 +546,7 @@
         const userRole = localStorage.getItem(sessionId + '_userRole');
 
         let currentTripDetails = null;
+        let serverOffsetMs = 0;
 
         const summaryElements = {
             trips: document.getElementById('summaryTrips'),
@@ -529,14 +572,14 @@
 
             const latestTrip = trips.reduce((latest, trip) => {
                 if (!latest) return trip;
-                const latestDate = latest?.fecha_solicitud ? new Date(latest.fecha_solicitud) : null;
-                const currentDate = trip?.fecha_solicitud ? new Date(trip.fecha_solicitud) : null;
+                const latestDate = latest?.fecha_solicitud ? getSyncedDate(latest.fecha_solicitud) : null;
+                const currentDate = trip?.fecha_solicitud ? getSyncedDate(trip.fecha_solicitud) : null;
                 if (!currentDate) return latest;
                 if (!latestDate || currentDate > latestDate) return trip;
                 return latest;
             }, null);
             if (summaryElements.lastTrip) {
-                const date = latestTrip?.fecha_solicitud ? new Date(latestTrip.fecha_solicitud) : null;
+                const date = latestTrip?.fecha_solicitud ? getSyncedDate(latestTrip.fecha_solicitud) : null;
                 const formatted = date ? date.toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--';
                 summaryElements.lastTrip.textContent = formatted;
             }
@@ -554,6 +597,31 @@
                     summaryElements.rating.textContent = avg.toFixed(1);
                 }
             }
+        }
+
+        async function syncServerOffset() {
+            try {
+                const response = await fetch(`${API}/system/time`, { cache: 'no-store' });
+                if (!response.ok) throw new Error('Sin respuesta del servidor');
+                const data = await response.json();
+                const serverTime = data.serverTime || data.isoServerTime;
+                if (serverTime) {
+                    serverOffsetMs = new Date(serverTime).getTime() - Date.now();
+                } else if (typeof data.epochMs === 'number') {
+                    serverOffsetMs = data.epochMs - Date.now();
+                }
+            } catch (error) {
+                serverOffsetMs = 0;
+            }
+        }
+
+        function getSyncedDate(dateString) {
+            if (!dateString) return null;
+            const parsed = new Date(dateString);
+            if (Number.isNaN(parsed.getTime())) {
+                return new Date(Date.now() + serverOffsetMs);
+            }
+            return new Date(parsed.getTime() + serverOffsetMs);
         }
 
         function formatSessionHint(payload) {
@@ -574,6 +642,7 @@
             resetSummary();
 
             try {
+                await syncServerOffset();
                 const response = await fetch(`${API}/trips/history`, {
                     headers: {
                         'user-email': userEmail,
@@ -654,6 +723,11 @@
                         `<span class="rating-stars">${'★'.repeat(trip.calificacion_conductor || trip.calificacion_pasajero)}</span>` : 
                         '<span>Sin calificar</span>'
                     }
+                </div>
+                <div class="trip-actions">
+                    <button class="danger-btn small-btn" data-action="delete-trip" data-trip-id="${trip.id_viaje || trip.id}">
+                        <i class="fas fa-trash"></i> Eliminar
+                    </button>
                 </div>
             `;
             
@@ -838,7 +912,8 @@
         }
 
         function formatDate(dateString) {
-            const date = new Date(dateString);
+            const date = getSyncedDate(dateString);
+            if (!date) return '--';
             return date.toLocaleDateString('es-ES', {
                 day: '2-digit',
                 month: '2-digit',
@@ -849,7 +924,8 @@
         }
 
         function formatDateTime(dateString) {
-            const date = new Date(dateString);
+            const date = getSyncedDate(dateString);
+            if (!date) return '--';
             return date.toLocaleString('es-ES', {
                 day: '2-digit',
                 month: '2-digit',
@@ -860,7 +936,8 @@
         }
 
         function formatTime(dateString) {
-            const date = new Date(dateString);
+            const date = getSyncedDate(dateString);
+            if (!date) return '--';
             return date.toLocaleTimeString('es-ES', {
                 hour: '2-digit',
                 minute: '2-digit'
@@ -947,6 +1024,57 @@
             }
         }
 
+        async function deleteTripHistoryItem(tripId) {
+            if (!tripId) return;
+            if (!confirm('¿Eliminar este viaje del historial?')) return;
+
+            try {
+                const response = await fetch(`${API}/trips/${tripId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId
+                    }
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'No se pudo eliminar el viaje');
+                }
+
+                showToast(data.message || 'Viaje eliminado', true);
+                loadTripHistory();
+            } catch (error) {
+                showToast(error.message || 'Error al eliminar viaje', false);
+            }
+        }
+
+        async function clearTripHistory() {
+            if (!confirm('¿Eliminar todo tu historial de viajes? Esta acción no se puede deshacer.')) return;
+
+            try {
+                const response = await fetch(`${API}/trips/history/clear`, {
+                    method: 'DELETE',
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole,
+                        'session-id': sessionId
+                    }
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.message || 'No se pudo eliminar el historial');
+                }
+
+                showToast(data.message || 'Historial eliminado', true);
+                loadTripHistory();
+            } catch (error) {
+                showToast(error.message || 'Error al eliminar historial', false);
+            }
+        }
+
         // Cerrar modal al hacer click fuera
         window.onclick = function(event) {
             const modal = document.getElementById('tripModal');
@@ -962,7 +1090,18 @@
                 setTimeout(() => window.location.href = 'index.html', 2000);
                 return;
             }
-            
+
+            const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+            clearHistoryBtn?.addEventListener('click', clearTripHistory);
+
+            const tripsList = document.getElementById('tripsList');
+            tripsList?.addEventListener('click', (event) => {
+                const button = event.target.closest('button[data-action="delete-trip"]');
+                if (!button) return;
+                event.stopPropagation();
+                deleteTripHistoryItem(button.dataset.tripId);
+            });
+
             loadTripHistory();
         });
     </script>
