@@ -4,6 +4,10 @@ const { Resend } = require("resend");
 const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
 console.log("RESEND_FROM =", process.env.RESEND_FROM);
 
+const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+console.log("RESEND_FROM =", process.env.RESEND_FROM);
+
 function normalizeEmailValue(value) {
   return value ? String(value).trim().toLowerCase() : "";
 }
@@ -38,6 +42,60 @@ async function sendEmail({ to, subject, text, html }) {
   return data;
 }
 
+async function sendEmail({ to, subject, text, html }) {
+    if (RESEND_API_KEY) {
+        try {
+            const response = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${RESEND_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    from: FROM,
+                    to,
+                    subject,
+                    text,
+                    html
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                console.log("❌ Error enviando correo (Resend):", payload);
+                return false;
+            }
+
+            console.log("✅ Correo enviado (Resend):", payload.id || "OK");
+            return true;
+        } catch (error) {
+            console.log("❌ Error enviando correo (Resend):", error);
+            return false;
+        }
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            }
+        });
+        console.log('✅ Correo enviado (SMTP):', info.messageId);
+        return true;
+    } catch (error) {
+        console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
+
 async function sendRecoveryMail(to, code) {
     try {
         // Verificar que sea correo ESPOCH
@@ -58,7 +116,6 @@ async function sendRecoveryMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: FROM,
             to: to,
             subject: `Código de Verificación UniRiders - ${code}`,
             text: `Tu código de verificación para UniRiders es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
@@ -84,33 +141,21 @@ async function sendRecoveryMail(to, code) {
       <div class="logo">🚗 UniRiders</div>
       <p style="margin: 5px 0 0 0; opacity: 0.9;">Plataforma de Movilidad Estudiantil - ESPOCH</p>
     </div>
+</body>
+</html>
+            `
+        };
 
-    <div class="content">
-      <h2 style="color: #323130; text-align: center; margin-bottom: 15px;">Verificación de Cuenta</h2>
-      <p style="color: #605e5c; text-align: center; font-size: 16px; line-height: 1.5;">
-        Hola integrante de UniRiders,<br>
-        Para completar tu registro en la plataforma, utiliza el siguiente código:
-      </p>
-
-      <div class="code-box">
-        <div style="font-size: 14px; color: #605e5c; margin-bottom: 8px;">CÓDIGO DE VERIFICACIÓN</div>
-        <h1 style="margin: 0; color: #0078d4; font-size: 32px; letter-spacing: 6px; font-weight: 600; font-family: 'Consolas', monospace;">${code}</h1>
-      </div>
-
-      <div class="warning">
-        <p style="margin: 0; color: #8a5500; font-size: 14px; line-height: 1.4;">
-          <strong>📋 Información importante:</strong><br>
-          • Este código expira en 10 minutos<br>
-          • Es de un solo uso<br>
-          • Si no reconoces esta solicitud, ignora este mensaje
-        </p>
-      </div>
-
-      <p style="color: #8a8886; text-align: center; font-size: 12px; margin-top: 25px; line-height: 1.4;">
-        Este es un mensaje automático del sistema UniRiders - ESPOCH<br>
-        Por favor no respondas a este correo.
-      </p>
-    </div>
+        console.log('📧 Intentando enviar correo a:', to);
+        const emailSent = await sendEmail(mailOptions);
+        if (!emailSent) {
+            return false;
+        }
+        
+        // Limpiar cache después de 1 hora
+        setTimeout(() => {
+            recentEmails.delete(to);
+        }, 60 * 60 * 1000);
 
     <div class="footer">
       <p style="margin: 0; font-size: 11px;">
@@ -159,7 +204,6 @@ async function sendAdminLoginMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: FROM,
             to,
             subject: `Código de acceso administrador - ${code}`,
             text: `Tu código de acceso administrador es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
@@ -207,8 +251,10 @@ async function sendAdminLoginMail(to, code) {
 </html>`
         };
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Código administrador enviado:', info.messageId);
+        const emailSent = await sendEmail(mailOptions);
+        if (!emailSent) {
+            return false;
+        }
 
         setTimeout(() => {
             recentEmails.delete(to);
