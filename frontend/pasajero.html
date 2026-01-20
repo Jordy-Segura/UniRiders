@@ -172,6 +172,10 @@
             cursor: pointer;
             font-weight: 600;
         }
+        .fare-chip.active {
+            background: var(--color-oro);
+            color: #1b1b1b;
+        }
         .fare-hint {
             font-size: 0.85em;
             opacity: 0.9;
@@ -911,9 +915,9 @@
                 </div>
             </div>
             <div class="fare-suggestions">
-                <button type="button" class="fare-chip">$2.50</button>
-                <button type="button" class="fare-chip">$3.00</button>
-                <button type="button" class="fare-chip">$3.50</button>
+                <button type="button" class="fare-chip" data-value="2.50">$2.50</button>
+                <button type="button" class="fare-chip" data-value="3.00">$3.00</button>
+                <button type="button" class="fare-chip" data-value="3.50">$3.50</button>
             </div>
             <p class="fare-hint">Propón un precio justo para recibir más respuestas rápidas.</p>
         </div>
@@ -1007,6 +1011,8 @@
         const requestPanel = document.getElementById('requestPanel');
         const activeTripPanel = document.getElementById('activeTripPanel');
         const requestRideBtn = document.getElementById('requestRideBtn');
+        const offerPriceInput = document.getElementById('offerPrice');
+        const fareChips = document.querySelectorAll('.fare-chip');
         const messageArea = document.getElementById('messageArea');
         const mapElement = document.getElementById('map');
         const mapFrame = document.getElementById('mapFrame');
@@ -1710,18 +1716,32 @@
             }, 3000); 
         }
 
+        fareChips.forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const value = chip.dataset.value;
+                offerPriceInput.value = value;
+                fareChips.forEach((btn) => btn.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+
         requestRideBtn.addEventListener('click', async () => {
             const origin = document.getElementById('origen').value.trim();
             const destination = document.getElementById('destino').value.trim();
             const paymentMethod = document.getElementById('paymentMethod').value;
+            const offerPrice = parseFloat(offerPriceInput.value);
 
             if (!origin || !destination) {
                 messageArea.innerText = "🚨 Ingresa origen y destino.";
                 return;
             }
+            if (Number.isNaN(offerPrice) || offerPrice <= 0) {
+                messageArea.innerText = "🚨 Ingresa una oferta válida para negociar.";
+                return;
+            }
 
             requestRideBtn.disabled = true;
-            requestRideBtn.innerText = 'Enviando solicitud...';
+            requestRideBtn.innerText = 'Enviando oferta...';
 
             try {
                 const res = await fetch(`${API}/trips/request`, {
@@ -1736,21 +1756,25 @@
                         passengerEmail: userEmail,
                         origin, 
                         destination, 
-                        paymentMethod 
+                        paymentMethod,
+                        offerPrice
                     })
                 });
                 const data = await res.json();
-                
+
                 currentTripId = data.tripId;
-                
+
                 messageArea.innerText = data.message;
+                if (estimatedPrice) {
+                    estimatedPrice.innerText = `$${offerPrice.toFixed(2)}`;
+                }
                 requestRideBtn.innerText = 'Buscando conductor... 🔄';
                 pollingStatusInterval = setInterval(checkTripStatus, 4000); 
 
             } catch (error) {
                 messageArea.innerText = "❌ Error al solicitar el viaje.";
                 requestRideBtn.disabled = false;
-                requestRideBtn.innerText = 'Solicitar Viaje 🚀';
+                requestRideBtn.innerText = 'Enviar oferta de viaje';
             }
         });
 
@@ -1768,7 +1792,7 @@
             activeTripPanel.style.display = 'none';
             mapElement.classList.remove('active');
             requestRideBtn.disabled = false;
-            requestRideBtn.innerText = 'Solicitar Viaje 🚀';
+            requestRideBtn.innerText = 'Enviar oferta de viaje';
             messageArea.innerText = '💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.';
             updateMoodMessage(true);
             shareLocationContainer.style.display = 'none';
