@@ -13,6 +13,7 @@ function isGmailEmail(email) {
 }
 
 let adminMap;
+let adminInfoWindow;
 const driverMarkers = new Map();
 let adminEmail = '';
 let adminName = '';
@@ -65,13 +66,34 @@ function baseHeaders(includeJson = true) {
     return headers;
 }
 
-function initializeMap() {
-    if (adminMap) return;
+function loadGoogleMapsScript(callbackName) {
+    if (window.google && window.google.maps) {
+        window[callbackName]();
+        return;
+    }
 
-    adminMap = L.map('adminMap').setView([-1.65962, -78.67638], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(adminMap);
+    const existingScript = document.querySelector('script[data-google-maps]');
+    if (existingScript) return;
+
+    const apiKey = document.body.dataset.googleMapsKey || window.GOOGLE_MAPS_API_KEY || '';
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleMaps = 'true';
+    document.head.appendChild(script);
+}
+
+function initializeMap() {
+    if (adminMap || !window.google || !window.google.maps) return;
+
+    adminMap = new google.maps.Map(document.getElementById('adminMap'), {
+        center: { lat: -1.65962, lng: -78.67638 },
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false
+    });
+    adminInfoWindow = new google.maps.InfoWindow();
 
     loadDriverLocations();
     setInterval(loadDriverLocations, 15000);
@@ -102,29 +124,40 @@ async function loadDriverLocations() {
             activeEmails.add(driver.email);
 
             if (!driverMarkers.has(driver.email)) {
-                const marker = L.circleMarker([driver.lat, driver.lon], {
-                    radius: 9,
-                    color: driver.available ? '#22c55e' : '#ef4444',
-                    fillColor: driver.available ? '#22c55e' : '#ef4444',
-                    fillOpacity: 0.9,
-                    weight: 2
-                }).addTo(adminMap);
-                marker.bindPopup(formatDriverPopup(driver));
+                const marker = new google.maps.Marker({
+                    position: { lat: driver.lat, lng: driver.lon },
+                    map: adminMap,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: driver.available ? '#22c55e' : '#ef4444',
+                        fillOpacity: 0.9,
+                        strokeColor: driver.available ? '#22c55e' : '#ef4444',
+                        strokeWeight: 2
+                    }
+                });
+                marker.addListener('click', () => {
+                    adminInfoWindow.setContent(formatDriverPopup(driver));
+                    adminInfoWindow.open(adminMap, marker);
+                });
                 driverMarkers.set(driver.email, marker);
             } else {
                 const marker = driverMarkers.get(driver.email);
-                marker.setLatLng([driver.lat, driver.lon]);
-                marker.setStyle({
-                    color: driver.available ? '#22c55e' : '#ef4444',
-                    fillColor: driver.available ? '#22c55e' : '#ef4444'
+                marker.setPosition({ lat: driver.lat, lng: driver.lon });
+                marker.setIcon({
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: driver.available ? '#22c55e' : '#ef4444',
+                    fillOpacity: 0.9,
+                    strokeColor: driver.available ? '#22c55e' : '#ef4444',
+                    strokeWeight: 2
                 });
-                marker.setPopupContent(formatDriverPopup(driver));
             }
         });
 
         driverMarkers.forEach((marker, email) => {
             if (!activeEmails.has(email)) {
-                adminMap.removeLayer(marker);
+                marker.setMap(null);
                 driverMarkers.delete(email);
             }
         });
@@ -459,17 +492,16 @@ function focusEmergencyOnMap(lat, lon) {
     const numericLon = parseFloat(lon);
     if (Number.isNaN(numericLat) || Number.isNaN(numericLon)) return;
 
-    adminMap.setView([numericLat, numericLon], 16);
-    const pulseMarker = L.circleMarker([numericLat, numericLon], {
-        radius: 12,
-        color: '#f97316',
-        fillColor: '#fb923c',
-        fillOpacity: 0.8,
-        weight: 2
-    }).addTo(adminMap);
+    adminMap.setCenter({ lat: numericLat, lng: numericLon });
+    adminMap.setZoom(16);
+    const pulseMarker = new google.maps.Marker({
+        position: { lat: numericLat, lng: numericLon },
+        map: adminMap,
+        animation: google.maps.Animation.BOUNCE
+    });
 
     setTimeout(() => {
-        adminMap.removeLayer(pulseMarker);
+        pulseMarker.setMap(null);
     }, 8000);
 }
 
@@ -659,7 +691,10 @@ function bootstrapAdminPanel() {
         adminEmailEl.textContent = adminEmail;
     }
 
-    initializeMap();
+    window.initAdminMaps = () => {
+        initializeMap();
+    };
+    loadGoogleMapsScript('initAdminMaps');
     attachEventListeners();
     updateManualUserPasswordRequirement();
     loadUsers();

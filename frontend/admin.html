@@ -7,10 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 </head>
-<body class="admin-body">
+<body class="admin-body" data-google-maps-key="">
     <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar tema"></button>
 
     <div class="admin-shell">
@@ -94,6 +92,34 @@
                             <li class="empty-state">Sin alertas recientes</li>
                         </ul>
                     </section>
+                </div>
+            </section>
+
+            <section class="admin-section">
+                <div class="admin-section__header">
+                    <div>
+                        <h2>Analítica en tiempo real</h2>
+                        <p>Seguimiento inmediato de viajes y rendimiento operativo.</p>
+                    </div>
+                </div>
+                <div class="admin-analytics-grid">
+                    <article class="admin-analytics-card">
+                        <h3>Viajes activos</h3>
+                        <p class="admin-analytics-value" id="analyticsActiveTrips">0</p>
+                        <div class="admin-analytics-meta" id="analyticsActiveTripsMeta">Actualizando...</div>
+                    </article>
+                    <article class="admin-analytics-card">
+                        <h3>Viajes completados</h3>
+                        <p class="admin-analytics-value" id="analyticsCompletedTrips">0</p>
+                        <div class="admin-analytics-meta" id="analyticsCompletedTripsMeta">Actualizando...</div>
+                    </article>
+                    <article class="admin-analytics-card">
+                        <h3>Tasa de finalización</h3>
+                        <p class="admin-analytics-value" id="analyticsCompletionRate">0%</p>
+                        <div class="progress-bar">
+                            <span id="analyticsCompletionBar" style="width: 0%;"></span>
+                        </div>
+                    </article>
                 </div>
             </section>
 

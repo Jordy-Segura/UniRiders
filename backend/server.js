@@ -3,6 +3,7 @@ require('dotenv').config();
 console.log("DB_SERVER:", process.env.DB_SERVER);
 
 const connectedUsers = new Map();
+const activeSessions = new Map();
 const typingUsers = new Map();
 const verificationCodes = new Map();
 
@@ -64,6 +65,56 @@ function sanitizePhoneNumber(phone) {
     const digits = String(phone).replace(/\D/g, "");
     return digits.length ? digits : null;
 }
+
+function registerSession(email) {
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    activeSessions.set(normalizeEmail(email), {
+        sessionId,
+        lastActive: Date.now()
+    });
+    return sessionId;
+}
+
+function isOpenSessionRoute(req) {
+    const openRoutes = new Set([
+        '/api/login',
+        '/api/register',
+        '/api/verify-registration',
+        '/api/resend-verification',
+        '/api/recover',
+        '/api/reset',
+        '/api/admin/request-code',
+        '/api/admin/verify-code'
+    ]);
+
+    if (!req.path.startsWith('/api')) return true;
+    if (openRoutes.has(req.path)) return true;
+    if (req.method === 'GET' && (
+        req.path === '/api/system/time' ||
+        req.path === '/api/stats/overview' ||
+        req.path === '/api/drivers/active'
+    )) return true;
+
+    return false;
+}
+
+app.use((req, res, next) => {
+    if (isOpenSessionRoute(req)) return next();
+    const email = normalizeEmail(req.headers['user-email']);
+    const sessionId = req.headers['session-id'];
+
+    if (!email || !sessionId) {
+        return res.status(401).json({ message: "Sesión requerida" });
+    }
+
+    const session = activeSessions.get(email);
+    if (!session || session.sessionId !== sessionId) {
+        return res.status(401).json({ message: "Sesión activa en otro dispositivo" });
+    }
+
+    session.lastActive = Date.now();
+    return next();
+});
 
 function isDriverBusy(email) {
     const normalizedEmail = normalizeEmail(email);
@@ -580,11 +631,14 @@ app.post("/api/login", async (req, res) => {
         // Actualizar usuario activo
         appStatistics.activeUsers++;
 
+        const sessionId = registerSession(user.email);
+
         res.json({ 
             message: "Login exitoso", 
             userEmail: user.email,
             userName: user.nombre,
-            role: user.rol
+            role: user.rol,
+            sessionId
         });
 
     } catch (err) {
@@ -675,11 +729,13 @@ app.post("/api/admin/verify-code", async (req, res) => {
         const adminRecord = adminLookup.recordset[0];
         verificationCodes.delete(normalizedEmail);
 
+        const sessionId = registerSession(adminRecord.email);
         res.json({
             message: "Acceso concedido",
             userEmail: adminRecord.email,
             userName: adminRecord.nombre || 'Administrador',
-            role: 'administrador'
+            role: 'administrador',
+            sessionId
         });
     } catch (err) {
         res.status(500).json({ message: "Error del servidor" });
@@ -2428,10 +2484,11 @@ app.get("/api/profile/:email/photo", async (req, res) => {
 
 // Ruta para logout
 app.post("/api/logout", (req, res) => {
-    const userEmail = req.headers['user-email'];
+    const userEmail = normalizeEmail(req.headers['user-email']);
     if (userEmail) {
         driverLocations.delete(userEmail);
         passengerLocations.delete(userEmail);
+        activeSessions.delete(userEmail);
         appStatistics.activeUsers = Math.max(0, appStatistics.activeUsers - 1);
     }
     res.json({ success: true, message: "Sesión cerrada" });

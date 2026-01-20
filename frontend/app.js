@@ -75,7 +75,7 @@ function showToast(msg, success = true) {
 }
 
 function createSessionFromAuth(data) {
-  const sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const sessionId = data.sessionId || ('session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
   localStorage.setItem(sessionId + '_userEmail', data.userEmail);
   localStorage.setItem(sessionId + '_userName', data.userName || 'Usuario');
   localStorage.setItem(sessionId + '_userRole', data.role);
