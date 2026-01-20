@@ -1022,4 +1022,16 @@ body.dark-mode .live-stats {
   .field-group {
     flex-direction: column;
   }
+
+  .auth-card .input-container input,
+  .auth-card .input-container select,
+  .profile-card .input-container input,
+  .profile-card .input-container select {
+    font-size: 16px;
+  }
+
+  .auth-card .submit-btn,
+  .profile-card .submit-btn {
+    transform: none;
+  }
 }
