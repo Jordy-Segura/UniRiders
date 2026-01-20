@@ -1187,6 +1187,7 @@
         let passengerCurrentLocation = null;
         let passengerLocationPolling = null;
         let currentChatInterval = null;
+        let textRouteFallback = null;
         let typingTimeout = null;
         let isTyping = false;
         let voiceRecognition = null;
@@ -1669,11 +1670,35 @@
             return `${baseUrl}?${params.toString()}`;
         }
 
+        function buildGoogleMapsUrlFromText(origin, destination) {
+            const baseUrl = 'https://maps.google.com/maps';
+            const params = new URLSearchParams({
+                hl: 'es',
+                t: 'm',
+                output: 'embed'
+            });
+
+            if (origin && destination) {
+                params.set('f', 'd');
+                params.set('source', 's_d');
+                params.set('saddr', origin);
+                params.set('daddr', destination);
+                params.set('z', '14');
+            } else if (origin) {
+                params.set('q', origin);
+                params.set('z', '15');
+            }
+
+            return `${baseUrl}?${params.toString()}`;
+        }
+
         function updateDriverMap() {
             if (!mapFrame) return;
 
             if (lastKnownDriverLocation && passengerCurrentLocation) {
                 mapFrame.src = buildGoogleMapsUrl(lastKnownDriverLocation, passengerCurrentLocation);
+            } else if (textRouteFallback) {
+                mapFrame.src = buildGoogleMapsUrlFromText(textRouteFallback.origin, textRouteFallback.destination);
             } else if (lastKnownDriverLocation) {
                 mapFrame.src = buildGoogleMapsUrl(lastKnownDriverLocation);
             }
@@ -1851,6 +1876,7 @@
                     headers: { 
                         'Content-Type': 'application/json',
                         'user-email': userEmail,
+                        'user-role': userRole || 'conductor',
                         'session-id': sessionId
                     },
                     body: JSON.stringify({ 
@@ -1872,14 +1898,21 @@
 
                     document.getElementById('activeTripPassengerName').innerText = currentTrip.passenger;
                     document.getElementById('activeTripOrigin').innerText = currentTrip.origin;
-                    document.getElementById('activeTripOriginCoords').innerText = `(${currentTrip.originCoords})`;
+                    document.getElementById('activeTripOriginCoords').innerText = currentTrip.originCoords ? `(${currentTrip.originCoords})` : '';
                     document.getElementById('activeTripDestination').innerText = currentTrip.destination;
-                    document.getElementById('activeTripDestinationCoords').innerText = `(${currentTrip.destinationCoords})`;
+                    document.getElementById('activeTripDestinationCoords').innerText = currentTrip.destinationCoords ? `(${currentTrip.destinationCoords})` : '';
                     document.getElementById('activeTripPayment').innerText = currentTrip.payment;
 
                     const originCoords = parseCoordsFromText(currentTrip.originCoords);
                     if (originCoords) {
                         passengerCurrentLocation = { lat: originCoords.lat, lon: originCoords.lon };
+                        textRouteFallback = null;
+                        updateDriverMap();
+                    } else {
+                        textRouteFallback = {
+                            origin: currentTrip.origin,
+                            destination: currentTrip.destination
+                        };
                         updateDriverMap();
                     }
                     updateNavigationAvailability();
@@ -1976,7 +2009,12 @@
                         // Limpiar chat después de un delay
                         setTimeout(async () => {
                             await fetch(`${API}/chat/${currentTrip.id}/clear`, {
-                                method: 'POST'
+                                method: 'POST',
+                                headers: {
+                                    'user-email': userEmail,
+                                    'user-role': userRole || 'conductor',
+                                    'session-id': sessionId
+                                }
                             });
                         }, 5000);
                         
@@ -1999,6 +2037,7 @@
                     passengerLocationPolling = null;
                 }
                 passengerCurrentLocation = null;
+                textRouteFallback = null;
                 updateNavigationAvailability();
                 if (mapFrame) {
                     mapFrame.src = buildGoogleMapsUrl({ lat: -1.65, lon: -78.68 });
@@ -2095,8 +2134,20 @@
             const fetchMessages = async () => {
                 try {
                     const [messagesRes, typingRes] = await Promise.all([
-                        fetch(`${API}/chat/${tripId}/messages`),
-                        fetch(`${API}/chat/${tripId}/typing`)
+                        fetch(`${API}/chat/${tripId}/messages`, {
+                            headers: {
+                                'user-email': userEmail,
+                                'user-role': userRole || 'conductor',
+                                'session-id': sessionId
+                            }
+                        }),
+                        fetch(`${API}/chat/${tripId}/typing`, {
+                            headers: {
+                                'user-email': userEmail,
+                                'user-role': userRole || 'conductor',
+                                'session-id': sessionId
+                            }
+                        })
                     ]);
                     
                     if (!messagesRes.ok) throw new Error('Error en respuesta del servidor');
@@ -2174,7 +2225,12 @@
                 try {
                     const res = await fetch(`${API}/chat/${tripId}/send`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'user-role': userRole || 'conductor',
+                            'session-id': sessionId
+                        },
                         body: JSON.stringify({ 
                             sender: userName, 
                             message: message 
@@ -2204,7 +2260,12 @@
                 try {
                     await fetch(`${API}/chat/${tripId}/typing`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'user-role': userRole || 'conductor',
+                            'session-id': sessionId
+                        },
                         body: JSON.stringify({ 
                             sender: userName, 
                             isTyping: typing 

@@ -2289,7 +2289,12 @@
                 // Limpiar chat cuando el conductor finaliza el viaje
                 if (currentTripId) {
                     fetch(`${API}/chat/${currentTripId}/clear`, {
-                        method: 'POST'
+                        method: 'POST',
+                        headers: {
+                            'user-email': userEmail,
+                            'user-role': userRole || 'pasajero',
+                            'session-id': sessionId
+                        }
                     }).catch(err => console.error('Error limpiando chat:', err));
                 }
                 alert("¡El conductor ha finalizado el viaje!");
@@ -2298,7 +2303,12 @@
                 // Limpiar chat al cancelar
                 if (currentTripId) {
                     fetch(`${API}/chat/${currentTripId}/clear`, {
-                        method: 'POST'
+                        method: 'POST',
+                        headers: {
+                            'user-email': userEmail,
+                            'user-role': userRole || 'pasajero',
+                            'session-id': sessionId
+                        }
                     }).catch(err => console.error('Error limpiando chat:', err));
                 }
                 
@@ -2332,8 +2342,20 @@
             const fetchMessages = async () => {
                 try {
                     const [messagesRes, typingRes] = await Promise.all([
-                        fetch(`${API}/chat/${tripId}/messages`),
-                        fetch(`${API}/chat/${tripId}/typing`)
+                        fetch(`${API}/chat/${tripId}/messages`, {
+                            headers: {
+                                'user-email': userEmail,
+                                'user-role': userRole || 'pasajero',
+                                'session-id': sessionId
+                            }
+                        }),
+                        fetch(`${API}/chat/${tripId}/typing`, {
+                            headers: {
+                                'user-email': userEmail,
+                                'user-role': userRole || 'pasajero',
+                                'session-id': sessionId
+                            }
+                        })
                     ]);
                     
                     if (!messagesRes.ok) throw new Error('Error en respuesta del servidor');
@@ -2411,7 +2433,12 @@
                 try {
                     const res = await fetch(`${API}/chat/${tripId}/send`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'user-role': userRole || 'pasajero',
+                            'session-id': sessionId
+                        },
                         body: JSON.stringify({ 
                             sender: userName, 
                             message: message 
@@ -2441,7 +2468,12 @@
                 try {
                     await fetch(`${API}/chat/${tripId}/typing`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-email': userEmail,
+                            'user-role': userRole || 'pasajero',
+                            'session-id': sessionId
+                        },
                         body: JSON.stringify({ 
                             sender: userName, 
                             isTyping: typing 

@@ -556,6 +556,18 @@
             }
         }
 
+        function formatSessionHint(payload) {
+            if (!payload || !payload.activeSession) return payload?.message || 'No fue posible cargar los viajes.';
+            const session = payload.activeSession;
+            const device = session.device || 'dispositivo desconocido';
+            const ip = session.ip ? `IP ${session.ip}` : null;
+            const lastActive = session.lastActive
+                ? new Date(session.lastActive).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
+                : null;
+            const details = [device, ip, lastActive ? `Última actividad: ${lastActive}` : null].filter(Boolean).join(' • ');
+            return `${payload.message || 'Sesión activa en otro dispositivo.'}${details ? ` (${details})` : ''}`;
+        }
+
         // Función para cargar historial de viajes
         async function loadTripHistory() {
             const tripsList = document.getElementById('tripsList');
@@ -569,8 +581,14 @@
                         'session-id': sessionId
                     }
                 });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    const message = formatSessionHint(data);
+                    throw new Error(message);
+                }
                 
-                const trips = await response.json();
+                const trips = Array.isArray(data) ? data : [];
 
                 if (trips.length === 0) {
                     resetSummary();
@@ -598,7 +616,7 @@
                     <div class="no-trips">
                         <i class="fas fa-exclamation-triangle"></i>
                         <h3>Error al cargar viajes</h3>
-                        <p>Intenta recargar la página.</p>
+                        <p>${error.message || 'Intenta recargar la página.'}</p>
                     </div>
                 `;
             }
