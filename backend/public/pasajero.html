@@ -910,7 +910,7 @@
 
     </style>
 </head>
-<body>
+<body data-google-maps-key="">
     <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo visual"></button>
     <div class="floating-illustration" aria-hidden="true">
         <i class="fas fa-motorcycle"></i>
@@ -1672,6 +1672,25 @@
         let originMarker = null;
         let destinationMarker = null;
         let selectionMode = 'origin';
+        let passengerGeocoder = null;
+
+        function loadGoogleMapsScript(callbackName) {
+            if (window.google && window.google.maps) {
+                window[callbackName]();
+                return;
+            }
+
+            const existingScript = document.querySelector('script[data-google-maps]');
+            if (existingScript) return;
+
+            const apiKey = document.body.dataset.googleMapsKey || window.GOOGLE_MAPS_API_KEY || '';
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`;
+            script.async = true;
+            script.defer = true;
+            script.dataset.googleMaps = 'true';
+            document.head.appendChild(script);
+        }
 
         // Lógica de Google Maps embebido
         function initMap() {
@@ -1701,8 +1720,20 @@
             return `${baseUrl}?${params.toString()}`;
         }
 
-        function formatCoordLabel(prefix, coords) {
-            return `${prefix}: ${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}`;
+        function setLocationLabel(fieldId, fallbackLabel, coords) {
+            const input = document.getElementById(fieldId);
+            if (!input) return;
+            if (!passengerGeocoder) {
+                input.value = fallbackLabel;
+                return;
+            }
+            passengerGeocoder.geocode({ location: { lat: coords.lat, lng: coords.lon } }, (results, status) => {
+                if (status === 'OK' && results && results[0]) {
+                    input.value = results[0].formatted_address;
+                } else {
+                    input.value = fallbackLabel;
+                }
+            });
         }
 
         function updateSelectionMode(mode) {
@@ -1716,34 +1747,50 @@
         function initSelectionMap() {
             if (!passengerSelectMap || passengerMap) return;
 
-            passengerMap = L.map(passengerSelectMap).setView([-1.65, -78.68], 13);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(passengerMap);
+            if (!window.google || !window.google.maps) {
+                showToast('Google Maps no está disponible. Configura la API key.', false);
+                return;
+            }
 
-            passengerMap.on('click', (event) => {
+            passengerGeocoder = new google.maps.Geocoder();
+            passengerMap = new google.maps.Map(passengerSelectMap, {
+                center: { lat: -1.65, lng: -78.68 },
+                zoom: 13,
+                mapTypeControl: false,
+                streetViewControl: false
+            });
+
+            passengerMap.addListener('click', (event) => {
                 const coords = {
-                    lat: event.latlng.lat,
-                    lon: event.latlng.lng
+                    lat: event.latLng.lat(),
+                    lon: event.latLng.lng()
                 };
 
                 if (selectionMode === 'origin') {
                     originCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
                     if (originMarker) {
-                        originMarker.setLatLng([coords.lat, coords.lon]);
+                        originMarker.setPosition({ lat: coords.lat, lng: coords.lon });
                     } else {
-                        originMarker = L.marker([coords.lat, coords.lon]).addTo(passengerMap);
+                        originMarker = new google.maps.Marker({
+                            position: { lat: coords.lat, lng: coords.lon },
+                            map: passengerMap,
+                            label: 'O'
+                        });
                     }
-                    document.getElementById('origen').value = formatCoordLabel('Origen', coords);
+                    setLocationLabel('origen', 'Origen seleccionado', coords);
                     updateSelectionMode('destination');
                 } else {
                     destinationCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
                     if (destinationMarker) {
-                        destinationMarker.setLatLng([coords.lat, coords.lon]);
+                        destinationMarker.setPosition({ lat: coords.lat, lng: coords.lon });
                     } else {
-                        destinationMarker = L.marker([coords.lat, coords.lon]).addTo(passengerMap);
+                        destinationMarker = new google.maps.Marker({
+                            position: { lat: coords.lat, lng: coords.lon },
+                            map: passengerMap,
+                            label: 'D'
+                        });
                     }
-                    document.getElementById('destino').value = formatCoordLabel('Destino', coords);
+                    setLocationLabel('destino', 'Destino seleccionado', coords);
                 }
 
                 updateRoutePreview();
@@ -2016,14 +2063,19 @@
                     lon: position.coords.longitude
                 };
                 originCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
-                document.getElementById('origen').value = formatCoordLabel('Origen', coords);
+                setLocationLabel('origen', 'Ubicación actual', coords);
                 if (originMarker && passengerMap) {
-                    originMarker.setLatLng([coords.lat, coords.lon]);
+                    originMarker.setPosition({ lat: coords.lat, lng: coords.lon });
                 } else if (passengerMap) {
-                    originMarker = L.marker([coords.lat, coords.lon]).addTo(passengerMap);
+                    originMarker = new google.maps.Marker({
+                        position: { lat: coords.lat, lng: coords.lon },
+                        map: passengerMap,
+                        label: 'O'
+                    });
                 }
                 if (passengerMap) {
-                    passengerMap.setView([coords.lat, coords.lon], 14);
+                    passengerMap.setCenter({ lat: coords.lat, lng: coords.lon });
+                    passengerMap.setZoom(14);
                 }
                 updateSelectionMode('destination');
                 updateRoutePreview();
@@ -2204,12 +2256,12 @@
             destinationCoordsValue = null;
             document.getElementById('origen').value = '';
             document.getElementById('destino').value = '';
-            if (originMarker && passengerMap) {
-                passengerMap.removeLayer(originMarker);
+            if (originMarker) {
+                originMarker.setMap(null);
                 originMarker = null;
             }
-            if (destinationMarker && passengerMap) {
-                passengerMap.removeLayer(destinationMarker);
+            if (destinationMarker) {
+                destinationMarker.setMap(null);
                 destinationMarker = null;
             }
             updateSelectionMode('origin');
@@ -2584,10 +2636,14 @@
             }
         }
 
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', () => {
+        window.initPassengerMaps = () => {
             initMap();
             initSelectionMap();
+        };
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGoogleMapsScript('initPassengerMaps');
             loadPassengerProfilePhoto();
             setupVoiceRecognition();
             // Reanudar viaje, historial, etc...

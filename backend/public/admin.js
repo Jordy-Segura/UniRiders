@@ -39,6 +39,12 @@ const kpiActiveUsersValue = document.getElementById('kpiActiveUsersValue');
 const kpiCompletedTodayValue = document.getElementById('kpiCompletedTodayValue');
 const kpiCompletedTodayInfo = document.getElementById('kpiCompletedTodayInfo');
 const kpiEarningsValue = document.getElementById('kpiEarningsValue');
+const analyticsActiveTrips = document.getElementById('analyticsActiveTrips');
+const analyticsActiveTripsMeta = document.getElementById('analyticsActiveTripsMeta');
+const analyticsCompletedTrips = document.getElementById('analyticsCompletedTrips');
+const analyticsCompletedTripsMeta = document.getElementById('analyticsCompletedTripsMeta');
+const analyticsCompletionRate = document.getElementById('analyticsCompletionRate');
+const analyticsCompletionBar = document.getElementById('analyticsCompletionBar');
 
 function showToast(message, success = true) {
     const toast = document.getElementById('toast');
@@ -342,9 +348,15 @@ async function refreshAdminStats() {
             if (kpiActiveUsersValue) {
                 kpiActiveUsersValue.textContent = stats.activeUsers ?? 0;
             }
+            if (analyticsActiveTrips) {
+                analyticsActiveTrips.textContent = stats.activeTrips ?? 0;
+            }
             const completedToday = stats.completedToday ?? stats.completedTrips ?? 0;
             if (kpiCompletedTodayValue) {
                 kpiCompletedTodayValue.textContent = completedToday;
+            }
+            if (analyticsCompletedTrips) {
+                analyticsCompletedTrips.textContent = stats.completedTrips ?? completedToday;
             }
             if (kpiCompletedTodayInfo && stats.syncedAt) {
                 const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
@@ -352,6 +364,20 @@ async function refreshAdminStats() {
             }
             if (kpiEarningsValue) {
                 kpiEarningsValue.textContent = currencyFormatter.format(Number(stats.totalEarnings || 0));
+            }
+            if (analyticsActiveTripsMeta && stats.syncedAt) {
+                const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                analyticsActiveTripsMeta.textContent = `Actualizado ${formatted}`;
+            }
+            if (analyticsCompletedTripsMeta && stats.syncedAt) {
+                const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                analyticsCompletedTripsMeta.textContent = `Actualizado ${formatted}`;
+            }
+            if (analyticsCompletionRate && analyticsCompletionBar) {
+                const total = (stats.completedTrips ?? 0) + (stats.activeTrips ?? 0);
+                const rate = total > 0 ? Math.round(((stats.completedTrips ?? 0) / total) * 100) : 0;
+                analyticsCompletionRate.textContent = `${rate}%`;
+                analyticsCompletionBar.style.width = `${rate}%`;
             }
         }
 

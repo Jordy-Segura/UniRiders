@@ -161,6 +161,53 @@ body.admin-body {
     align-items: start;
 }
 
+.admin-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.admin-analytics-card {
+    background: rgba(15, 23, 42, 0.75);
+    border-radius: 16px;
+    padding: 1.2rem;
+    color: #f8fafc;
+    display: grid;
+    gap: 0.6rem;
+    box-shadow: 0 20px 40px -28px rgba(15, 23, 42, 0.7);
+}
+
+.admin-analytics-card h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.admin-analytics-value {
+    font-size: 2rem;
+    margin: 0;
+    font-weight: 700;
+}
+
+.admin-analytics-meta {
+    font-size: 0.85rem;
+    color: rgba(226, 232, 240, 0.7);
+}
+
+.progress-bar {
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.2);
+    overflow: hidden;
+}
+
+.progress-bar span {
+    display: block;
+    height: 100%;
+    background: #22c55e;
+    border-radius: 999px;
+    transition: width 0.3s ease;
+}
+
 .admin-card {
     background: var(--admin-card-bg);
     border-radius: 1.2rem;

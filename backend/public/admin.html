@@ -98,6 +98,34 @@
             <section class="admin-section">
                 <div class="admin-section__header">
                     <div>
+                        <h2>Analítica en tiempo real</h2>
+                        <p>Seguimiento inmediato de viajes y rendimiento operativo.</p>
+                    </div>
+                </div>
+                <div class="admin-analytics-grid">
+                    <article class="admin-analytics-card">
+                        <h3>Viajes activos</h3>
+                        <p class="admin-analytics-value" id="analyticsActiveTrips">0</p>
+                        <div class="admin-analytics-meta" id="analyticsActiveTripsMeta">Actualizando...</div>
+                    </article>
+                    <article class="admin-analytics-card">
+                        <h3>Viajes completados</h3>
+                        <p class="admin-analytics-value" id="analyticsCompletedTrips">0</p>
+                        <div class="admin-analytics-meta" id="analyticsCompletedTripsMeta">Actualizando...</div>
+                    </article>
+                    <article class="admin-analytics-card">
+                        <h3>Tasa de finalización</h3>
+                        <p class="admin-analytics-value" id="analyticsCompletionRate">0%</p>
+                        <div class="progress-bar">
+                            <span id="analyticsCompletionBar" style="width: 0%;"></span>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section class="admin-section">
+                <div class="admin-section__header">
+                    <div>
                         <h2>Gestión de usuarios</h2>
                         <p>Actualiza roles, controla accesos y crea usuarios manualmente.</p>
                     </div>
