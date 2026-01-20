@@ -85,6 +85,28 @@
             margin-top: 20px;
             text-align: left;
         }
+        .negotiation-panel {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .negotiation-panel h4 {
+            margin-bottom: 6px;
+        }
+        .negotiation-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .negotiation-tag {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 0.85em;
+        }
         .offers-list {
             max-height: 250px; 
             overflow-y: auto;
@@ -129,6 +151,19 @@
             cursor: pointer;
             margin-left: 10px;
             transition: transform 0.3s;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px 0 30px;
+            }
+            .main-panel {
+                padding: 20px;
+                width: 94%;
+            }
+            .offers-list {
+                max-height: 220px;
+            }
         }
 
         /* Mapa de Google */
@@ -964,7 +999,17 @@
         <p id="geoStatus">Estado: Fuera de línea</p>
 
         <div class="offers-panel" id="offersPanel">
-            <h3>🏍️ Ofertas de Viaje Recientes</h3>
+            <h3>🏍️ Feed de ofertas (modelo inDrive)</h3>
+            <div class="negotiation-panel">
+                <h4>📍 Ves destino + precio antes de aceptar</h4>
+                <p>Negocia con contraofertas rápidas si el viaje requiere más distancia o tiempo.</p>
+                <div class="negotiation-tags">
+                    <span class="negotiation-tag">Aceptar</span>
+                    <span class="negotiation-tag">+ $1</span>
+                    <span class="negotiation-tag">+ $2</span>
+                    <span class="negotiation-tag">Ignorar sin penalización</span>
+                </div>
+            </div>
             <div class="offers-list" id="offersList">
                 <div class="no-offers">Activa tu servicio para ver viajes.</div>
             </div>

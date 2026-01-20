@@ -124,6 +124,63 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
+        .fare-panel {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 16px;
+            border-radius: 14px;
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .fare-panel h4 {
+            margin-bottom: 8px;
+        }
+        .fare-inputs {
+            display: grid;
+            gap: 10px;
+        }
+        .fare-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .fare-field span {
+            font-weight: 700;
+        }
+        .fare-field input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            flex: 1;
+            outline: none;
+        }
+        .fare-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .fare-chip {
+            border: none;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .fare-chip.active {
+            background: var(--color-oro);
+            color: #1b1b1b;
+        }
+        .fare-hint {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
         .logout-btn {
             background: white;
             color: var(--color-azul);
@@ -143,6 +200,26 @@
             cursor: pointer;
             margin-left: 10px;
             transition: transform 0.3s;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px 0 30px;
+            }
+            .main-panel {
+                padding: 20px;
+                width: 94%;
+            }
+            .message-area {
+                font-size: 1em;
+                height: auto;
+                padding: 12px;
+            }
+            .search-form input,
+            .search-form select,
+            .search-btn {
+                font-size: 15px;
+            }
         }
 
         /* Chat - ESTILOS MEJORADOS */
@@ -829,6 +906,22 @@
             </div>
         </div>
 
+        <div class="fare-panel">
+            <h4>💸 Tu oferta al conductor</h4>
+            <div class="fare-inputs">
+                <div class="fare-field">
+                    <span>$</span>
+                    <input type="number" id="offerPrice" min="1" step="0.5" placeholder="3.00">
+                </div>
+            </div>
+            <div class="fare-suggestions">
+                <button type="button" class="fare-chip" data-value="2.50">$2.50</button>
+                <button type="button" class="fare-chip" data-value="3.00">$3.00</button>
+                <button type="button" class="fare-chip" data-value="3.50">$3.50</button>
+            </div>
+            <p class="fare-hint">Propón un precio justo para recibir más respuestas rápidas.</p>
+        </div>
+
         <div class="search-form">
             <input type="text" id="origen" placeholder="📍 Origen (Ej: Sede Centro)">
             <input type="text" id="destino" placeholder="🏁 Destino (Ej: Sede Norte)">
@@ -836,11 +929,11 @@
                 <option value="Efectivo">Efectivo 💵</option>
                 <option value="Tarjeta">Transferencia 💳</option>
             </select>
-            <button class="search-btn" id="requestRideBtn">🚀 Solicitar Viaje Premium</button>
+            <button class="search-btn" id="requestRideBtn">🚀 Enviar oferta de viaje</button>
         </div>
 
         <div class="message-area" id="messageArea">
-            💫 Ingresa tu destino y viaja con los mejores conductores
+            💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.
         </div>
     </div>
 
@@ -918,6 +1011,8 @@
         const requestPanel = document.getElementById('requestPanel');
         const activeTripPanel = document.getElementById('activeTripPanel');
         const requestRideBtn = document.getElementById('requestRideBtn');
+        const offerPriceInput = document.getElementById('offerPrice');
+        const fareChips = document.querySelectorAll('.fare-chip');
         const messageArea = document.getElementById('messageArea');
         const mapElement = document.getElementById('map');
         const mapFrame = document.getElementById('mapFrame');
@@ -955,7 +1050,7 @@
             if (!messageArea) return;
             if (currentTripId && !force) return;
 
-            let baseMessage = '💫 Ingresa tu destino y viaja con los mejores conductores';
+            let baseMessage = '💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.';
             if (selectedMoods.has('express')) {
                 baseMessage = '⚡ Indica tu destino y prepárate para llegar a tiempo.';
             } else if (selectedMoods.has('chill')) {
@@ -1621,18 +1716,32 @@
             }, 3000); 
         }
 
+        fareChips.forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const value = chip.dataset.value;
+                offerPriceInput.value = value;
+                fareChips.forEach((btn) => btn.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+
         requestRideBtn.addEventListener('click', async () => {
             const origin = document.getElementById('origen').value.trim();
             const destination = document.getElementById('destino').value.trim();
             const paymentMethod = document.getElementById('paymentMethod').value;
+            const offerPrice = parseFloat(offerPriceInput.value);
 
             if (!origin || !destination) {
                 messageArea.innerText = "🚨 Ingresa origen y destino.";
                 return;
             }
+            if (Number.isNaN(offerPrice) || offerPrice <= 0) {
+                messageArea.innerText = "🚨 Ingresa una oferta válida para negociar.";
+                return;
+            }
 
             requestRideBtn.disabled = true;
-            requestRideBtn.innerText = 'Enviando solicitud...';
+            requestRideBtn.innerText = 'Enviando oferta...';
 
             try {
                 const res = await fetch(`${API}/trips/request`, {
@@ -1647,21 +1756,25 @@
                         passengerEmail: userEmail,
                         origin, 
                         destination, 
-                        paymentMethod 
+                        paymentMethod,
+                        offerPrice
                     })
                 });
                 const data = await res.json();
-                
+
                 currentTripId = data.tripId;
-                
+
                 messageArea.innerText = data.message;
+                if (estimatedPrice) {
+                    estimatedPrice.innerText = `$${offerPrice.toFixed(2)}`;
+                }
                 requestRideBtn.innerText = 'Buscando conductor... 🔄';
                 pollingStatusInterval = setInterval(checkTripStatus, 4000); 
 
             } catch (error) {
                 messageArea.innerText = "❌ Error al solicitar el viaje.";
                 requestRideBtn.disabled = false;
-                requestRideBtn.innerText = 'Solicitar Viaje 🚀';
+                requestRideBtn.innerText = 'Enviar oferta de viaje';
             }
         });
 
@@ -1679,8 +1792,8 @@
             activeTripPanel.style.display = 'none';
             mapElement.classList.remove('active');
             requestRideBtn.disabled = false;
-            requestRideBtn.innerText = 'Solicitar Viaje 🚀';
-            messageArea.innerText = '💫 Ingresa tu destino y viaja con los mejores conductores';
+            requestRideBtn.innerText = 'Enviar oferta de viaje';
+            messageArea.innerText = '💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.';
             updateMoodMessage(true);
             shareLocationContainer.style.display = 'none';
             if (shareLocationBtn) {

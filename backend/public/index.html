@@ -159,18 +159,50 @@
         </div>
     </div>
 
-    <div class="auth-container">
-        <h1 class="logo">UniRiders 🏍️</h1>
-        <p style="color: white; margin-bottom: 20px; font-size: 0.9em;">
-            🏍️ Compartiendo viajes seguros en la ESPOCH
-        </p>
-        
-        <div class="button-switcher">
-            <button id="loginBtn" class="active">INICIAR SESIÓN</button>
-            <button id="registerBtn">REGISTRARSE</button>
-        </div>
+    <main class="landing">
+        <section class="landing__intro">
+            <span class="landing__pill"><i class="fas fa-comments-dollar"></i> Negocia tu tarifa en tiempo real</span>
+            <h2>Tu viaje, tu precio. Inspirado en la flexibilidad de inDrive.</h2>
+            <p>
+                UniRiders ahora resalta lo mejor del modelo de negociación: tú propones cuánto quieres pagar,
+                comparas respuestas y eliges a tu conductor según precio, vehículo y calificación.
+            </p>
+            <div class="landing__cards">
+                <div class="landing-card">
+                    <h3>👤 Para Pasajeros</h3>
+                    <ul>
+                        <li><i class="fas fa-location-dot"></i> Ingresa origen y destino, y propone tu tarifa.</li>
+                        <li><i class="fas fa-bolt"></i> Recibe contraofertas en tiempo real si tienes prisa.</li>
+                        <li><i class="fas fa-star"></i> Elige conductor por precio, tiempo y reputación.</li>
+                    </ul>
+                </div>
+                <div class="landing-card">
+                    <h3>🏍️ Para Conductores</h3>
+                    <ul>
+                        <li><i class="fas fa-route"></i> Revisa destino y oferta antes de aceptar.</li>
+                        <li><i class="fas fa-handshake"></i> Negocia con contraofertas rápidas (+$1, +$2).</li>
+                        <li><i class="fas fa-shield"></i> Sin penalización por ignorar viajes lejanos.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="landing-highlight">
+                <i class="fas fa-wallet"></i>
+                <span>Pago directo al conductor, con comisión baja descontada por recargas en la app.</span>
+            </div>
+        </section>
 
-        <div class="auth-card active" id="authCard">
+        <section class="auth-container">
+            <h1 class="logo">UniRiders 🏍️</h1>
+            <p style="color: white; margin-bottom: 20px; font-size: 0.9em;">
+                🏍️ Compartiendo viajes seguros en la ESPOCH
+            </p>
+            
+            <div class="button-switcher">
+                <button id="loginBtn" class="active">INICIAR SESIÓN</button>
+                <button id="registerBtn">REGISTRARSE</button>
+            </div>
+
+            <div class="auth-card active" id="authCard">
             
             <form id="loginForm" class="auth-form active">
                 <p>¡Bienvenido de vuelta! 👋</p>
@@ -333,8 +365,9 @@
                 </a>
             </form>
 
-        </div>
-    </div>
+            </div>
+        </section>
+    </main>
 
     <div id="toast" class="toast"></div>
 
