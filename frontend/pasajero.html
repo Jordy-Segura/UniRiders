@@ -832,6 +832,7 @@
         <div class="search-form">
             <input type="text" id="origen" placeholder="📍 Origen (Ej: Sede Centro)">
             <input type="text" id="destino" placeholder="🏁 Destino (Ej: Sede Norte)">
+            <input type="number" id="fareOffer" placeholder="💰 Tarifa propuesta (USD)" min="0.5" step="0.5">
             <select id="paymentMethod">
                 <option value="Efectivo">Efectivo 💵</option>
                 <option value="Tarjeta">Transferencia 💳</option>
@@ -861,7 +862,7 @@
             <p>📍 De: <strong id="activeTripOriginDisplay"></strong></p>
             <p>🏁 A: <strong id="activeTripDestinationDisplay"></strong></p>
             <p>⏱️ Tiempo estimado: <strong id="passengerEstimatedTime">15 min</strong></p>
-            <p>💰 Precio estimado: <strong id="estimatedPrice">$3.50</strong></p>
+            <p>💰 Tarifa propuesta: <strong id="activeTripFare">$--</strong></p>
         </div>
 
         <div id="map" class="active">
@@ -922,10 +923,15 @@
         const mapElement = document.getElementById('map');
         const mapFrame = document.getElementById('mapFrame');
         const driverMapCoords = document.getElementById('driverMapCoords');
+        const fareOfferInput = document.getElementById('fareOffer');
+        const activeTripFare = document.getElementById('activeTripFare');
         const shareLocationContainer = document.getElementById('shareLocationContainer');
         const shareLocationBtn = document.getElementById('shareLocationBtn');
         const passengerLocationStatus = document.getElementById('passengerLocationStatus');
         let currentTripId = null;
+        let currentFareOffer = null;
+        let currentTripOrigin = null;
+        let currentTripDestination = null;
         const loyaltyProgressIndicator = document.getElementById('loyaltyProgressIndicator');
         const loyaltyTripsLabel = document.getElementById('loyaltyTrips');
         const loyaltyTagline = document.getElementById('loyaltyTagline');
@@ -1450,6 +1456,35 @@
             return `${baseUrl}?${params.toString()}`;
         }
 
+        function buildGoogleMapsUrlFromText(origin, destination) {
+            if (!origin || !destination) return null;
+            const baseUrl = 'https://maps.google.com/maps';
+            const params = new URLSearchParams({
+                hl: 'es',
+                t: 'm',
+                z: '14',
+                output: 'embed',
+                f: 'd',
+                source: 's_d',
+                saddr: origin,
+                daddr: destination
+            });
+
+            return `${baseUrl}?${params.toString()}`;
+        }
+
+        function formatFareValue(value) {
+            if (value === null || value === undefined || value === '') return '$--';
+            const numericValue = Number(value);
+            if (!Number.isFinite(numericValue)) return '$--';
+            return `$${numericValue.toFixed(2)}`;
+        }
+
+        function updateFareDisplay(value) {
+            if (!activeTripFare) return;
+            activeTripFare.innerText = formatFareValue(value);
+        }
+
         function updateMapEmbed() {
             if (!mapFrame) return;
 
@@ -1459,6 +1494,11 @@
                 mapFrame.src = buildGoogleMapsUrl(lastDriverLocation);
             } else if (passengerSharedLocation) {
                 mapFrame.src = buildGoogleMapsUrl(passengerSharedLocation);
+            } else {
+                const routeUrl = buildGoogleMapsUrlFromText(currentTripOrigin, currentTripDestination);
+                if (routeUrl) {
+                    mapFrame.src = routeUrl;
+                }
             }
         }
 
@@ -1550,8 +1590,11 @@
                     
                     currentDriverName = data.driver;
                     document.getElementById('activeTripDriverName').innerText = currentDriverName;
-                    document.getElementById('activeTripOriginDisplay').innerText = document.getElementById('origen').value;
-                    document.getElementById('activeTripDestinationDisplay').innerText = document.getElementById('destino').value;
+                    currentTripOrigin = document.getElementById('origen').value;
+                    currentTripDestination = document.getElementById('destino').value;
+                    document.getElementById('activeTripOriginDisplay').innerText = currentTripOrigin;
+                    document.getElementById('activeTripDestinationDisplay').innerText = currentTripDestination;
+                    updateFareDisplay(currentFareOffer);
 
                     // Verificar si el conductor es favorito
                     const favoriteBtn = document.getElementById('favoriteBtn');
@@ -1625,9 +1668,17 @@
             const origin = document.getElementById('origen').value.trim();
             const destination = document.getElementById('destino').value.trim();
             const paymentMethod = document.getElementById('paymentMethod').value;
+            const fareValue = fareOfferInput ? fareOfferInput.value : '';
+            const parsedFare = fareValue ? Number(fareValue) : null;
+            const offerFare = Number.isFinite(parsedFare) && parsedFare > 0 ? parsedFare : null;
 
             if (!origin || !destination) {
                 messageArea.innerText = "🚨 Ingresa origen y destino.";
+                return;
+            }
+
+            if (!offerFare) {
+                messageArea.innerText = "💰 Ingresa una tarifa propuesta para el conductor.";
                 return;
             }
 
@@ -1647,15 +1698,21 @@
                         passengerEmail: userEmail,
                         origin, 
                         destination, 
-                        paymentMethod 
+                        paymentMethod,
+                        offeredFare: offerFare
                     })
                 });
                 const data = await res.json();
                 
                 currentTripId = data.tripId;
+                currentFareOffer = offerFare;
+                currentTripOrigin = origin;
+                currentTripDestination = destination;
+                updateFareDisplay(offerFare);
                 
                 messageArea.innerText = data.message;
                 requestRideBtn.innerText = 'Buscando conductor... 🔄';
+                updateMapEmbed();
                 pollingStatusInterval = setInterval(checkTripStatus, 4000); 
 
             } catch (error) {
@@ -1682,6 +1739,13 @@
             requestRideBtn.innerText = 'Solicitar Viaje 🚀';
             messageArea.innerText = '💫 Ingresa tu destino y viaja con los mejores conductores';
             updateMoodMessage(true);
+            currentFareOffer = null;
+            currentTripOrigin = null;
+            currentTripDestination = null;
+            if (fareOfferInput) {
+                fareOfferInput.value = '';
+            }
+            updateFareDisplay(null);
             shareLocationContainer.style.display = 'none';
             if (shareLocationBtn) {
                 shareLocationBtn.disabled = false;
@@ -1991,8 +2055,11 @@
                     
                     const tripDetails = await detailsRes.json();
                     
-                    document.getElementById('activeTripOriginDisplay').innerText = tripDetails.origen;
-                    document.getElementById('activeTripDestinationDisplay').innerText = tripDetails.destino;
+                    currentTripOrigin = tripDetails.origen;
+                    currentTripDestination = tripDetails.destino;
+                    document.getElementById('activeTripOriginDisplay').innerText = currentTripOrigin;
+                    document.getElementById('activeTripDestinationDisplay').innerText = currentTripDestination;
+                    updateFareDisplay(tripDetails.costo);
                     
                     // Verificar si el conductor es favorito
                     const favoriteBtn = document.getElementById('favoriteBtn');

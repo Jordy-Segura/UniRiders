@@ -233,7 +233,8 @@ CREATE PROCEDURE sp_RegistrarViaje
     @id_tarifa       INT,
     @origen          NVARCHAR(255),
     @destino         NVARCHAR(255),
-    @metodo_pago     NVARCHAR(50)
+    @metodo_pago     NVARCHAR(50),
+    @costo           DECIMAL(10,2) = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -244,6 +245,7 @@ BEGIN
         origen,
         destino,
         estado,
+        costo,
         metodo_pago,
         fecha_solicitud
     )
@@ -255,6 +257,7 @@ BEGIN
         @origen,
         @destino,
         'pendiente',
+        @costo,
         @metodo_pago,
         GETDATE()
     );
@@ -362,7 +365,8 @@ EXEC sp_RegistrarViaje
     @id_tarifa       = 1,
     @origen          = 'Parque Central',
     @destino         = 'Campus ESPOCH',
-    @metodo_pago     = 'Efectivo';
+    @metodo_pago     = 'Efectivo',
+    @costo           = 3.50;
 GO
 
 -- 7.4 Aceptar el viaje (id_viaje = 1)
