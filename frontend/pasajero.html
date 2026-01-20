@@ -124,6 +124,171 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
+        .fare-panel {
+            background: rgba(0, 0, 0, 0.25);
+            padding: 16px;
+            border-radius: 14px;
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .fare-panel h4 {
+            margin-bottom: 8px;
+        }
+        .fare-inputs {
+            display: grid;
+            gap: 10px;
+        }
+        .fare-field {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 10px 12px;
+        }
+        .fare-field span {
+            font-weight: 700;
+        }
+        .fare-field input {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            flex: 1;
+            outline: none;
+        }
+        .fare-suggestions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .fare-chip {
+            border: none;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .fare-chip.active {
+            background: var(--color-oro);
+            color: #1b1b1b;
+        }
+        .fare-hint {
+            font-size: 0.85em;
+            opacity: 0.9;
+            margin-top: 8px;
+        }
+        .route-panel {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 14px;
+            border-radius: 14px;
+            text-align: left;
+            margin-bottom: 20px;
+        }
+        .route-panel h4 {
+            margin-bottom: 10px;
+        }
+        .route-helper {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.85);
+        }
+        .route-map {
+            width: 100%;
+            height: 260px;
+            border-radius: 14px;
+            margin-top: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .route-mode {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .route-mode button {
+            border: none;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        .route-mode button.active {
+            background: var(--color-oro);
+            color: #1b1b1b;
+        }
+        .route-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .route-actions button,
+        .route-actions a {
+            border: none;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            color: #1b1b1b;
+            background: var(--color-oro);
+        }
+        .route-actions a {
+            background: rgba(255, 255, 255, 0.25);
+            color: white;
+        }
+        .route-preview {
+            width: 100%;
+            height: 220px;
+            border-radius: 12px;
+            border: none;
+            margin-top: 12px;
+            display: none;
+        }
+        .route-preview.active {
+            display: block;
+        }
+        .counteroffer-panel {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 16px;
+            border-radius: 14px;
+            text-align: left;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .counteroffer-panel.active {
+            display: block;
+        }
+        .counteroffer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .counteroffer-actions button {
+            border: none;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .counteroffer-accept {
+            background: var(--color-verde-espoch);
+            color: white;
+        }
+        .counteroffer-reoffer {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
         .logout-btn {
             background: white;
             color: var(--color-azul);
@@ -143,6 +308,26 @@
             cursor: pointer;
             margin-left: 10px;
             transition: transform 0.3s;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px 0 30px;
+            }
+            .main-panel {
+                padding: 20px;
+                width: 94%;
+            }
+            .message-area {
+                font-size: 1em;
+                height: auto;
+                padding: 12px;
+            }
+            .search-form input,
+            .search-form select,
+            .search-btn {
+                font-size: 15px;
+            }
         }
 
         /* Chat - ESTILOS MEJORADOS */
@@ -723,7 +908,7 @@
 
     </style>
 </head>
-<body>
+<body data-google-maps-key="">
     <button class="theme-toggle" type="button" data-theme-toggle aria-label="Cambiar modo visual"></button>
     <div class="floating-illustration" aria-hidden="true">
         <i class="fas fa-motorcycle"></i>
@@ -829,18 +1014,62 @@
             </div>
         </div>
 
+        <div class="fare-panel">
+            <h4>💸 Tu oferta al conductor</h4>
+            <div class="fare-inputs">
+                <div class="fare-field">
+                    <span>$</span>
+                    <input type="number" id="offerPrice" min="1" step="0.5" placeholder="3.00">
+                </div>
+            </div>
+            <div class="fare-suggestions">
+                <button type="button" class="fare-chip" data-value="2.50">$2.50</button>
+                <button type="button" class="fare-chip" data-value="3.00">$3.00</button>
+                <button type="button" class="fare-chip" data-value="3.50">$3.50</button>
+            </div>
+            <p class="fare-hint">Propón un precio justo para recibir más respuestas rápidas.</p>
+        </div>
+
+        <div class="counteroffer-panel" id="counterofferPanel">
+            <h4>🤝 Contraoferta recibida</h4>
+            <p id="counterofferText">Un conductor te propone un nuevo valor.</p>
+            <div class="fare-field" style="margin-top: 10px;">
+                <span>$</span>
+                <input type="number" id="reofferPrice" min="1" step="0.5" placeholder="Tu contraoferta">
+            </div>
+            <div class="counteroffer-actions">
+                <button type="button" class="counteroffer-accept" id="acceptCounterBtn">✅ Aceptar contraoferta</button>
+                <button type="button" class="counteroffer-reoffer" id="sendReofferBtn">🔁 Enviar nueva oferta</button>
+            </div>
+        </div>
+
+        <div class="route-panel">
+            <h4>🗺️ Ruta en Google Maps</h4>
+            <p class="route-helper">Toca el mapa para marcar origen y destino sin escribir.</p>
+            <div class="route-mode">
+                <button type="button" id="selectOriginBtn" class="active">📍 Seleccionar origen</button>
+                <button type="button" id="selectDestinationBtn">🏁 Seleccionar destino</button>
+            </div>
+            <div id="passengerSelectMap" class="route-map" aria-label="Mapa para seleccionar origen y destino"></div>
+            <div class="route-actions">
+                <button type="button" id="useLocationBtn">📍 Usar mi ubicación</button>
+                <button type="button" id="previewRouteBtn">🔍 Ver ruta</button>
+            </div>
+            <iframe id="routePreviewFrame" class="route-preview" title="Vista previa de ruta" loading="lazy"></iframe>
+        </div>
+
         <div class="search-form">
-            <input type="text" id="origen" placeholder="📍 Origen (Ej: Sede Centro)">
-            <input type="text" id="destino" placeholder="🏁 Destino (Ej: Sede Norte)">
+            <input type="text" id="origen" placeholder="📍 Selecciona el origen en el mapa" readonly>
+            <input type="text" id="destino" placeholder="🏁 Selecciona el destino en el mapa" readonly>
             <select id="paymentMethod">
                 <option value="Efectivo">Efectivo 💵</option>
                 <option value="Tarjeta">Transferencia 💳</option>
             </select>
-            <button class="search-btn" id="requestRideBtn">🚀 Solicitar Viaje Premium</button>
+            <button class="search-btn" id="requestRideBtn">🚀 Enviar oferta de viaje</button>
         </div>
 
         <div class="message-area" id="messageArea">
-            💫 Ingresa tu destino y viaja con los mejores conductores
+            💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.
         </div>
     </div>
 
@@ -918,6 +1147,19 @@
         const requestPanel = document.getElementById('requestPanel');
         const activeTripPanel = document.getElementById('activeTripPanel');
         const requestRideBtn = document.getElementById('requestRideBtn');
+        const offerPriceInput = document.getElementById('offerPrice');
+        const fareChips = document.querySelectorAll('.fare-chip');
+        const counterofferPanel = document.getElementById('counterofferPanel');
+        const counterofferText = document.getElementById('counterofferText');
+        const acceptCounterBtn = document.getElementById('acceptCounterBtn');
+        const sendReofferBtn = document.getElementById('sendReofferBtn');
+        const reofferPriceInput = document.getElementById('reofferPrice');
+        const previewRouteBtn = document.getElementById('previewRouteBtn');
+        const useLocationBtn = document.getElementById('useLocationBtn');
+        const routePreviewFrame = document.getElementById('routePreviewFrame');
+        const selectOriginBtn = document.getElementById('selectOriginBtn');
+        const selectDestinationBtn = document.getElementById('selectDestinationBtn');
+        const passengerSelectMap = document.getElementById('passengerSelectMap');
         const messageArea = document.getElementById('messageArea');
         const mapElement = document.getElementById('map');
         const mapFrame = document.getElementById('mapFrame');
@@ -955,7 +1197,7 @@
             if (!messageArea) return;
             if (currentTripId && !force) return;
 
-            let baseMessage = '💫 Ingresa tu destino y viaja con los mejores conductores';
+            let baseMessage = '💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.';
             if (selectedMoods.has('express')) {
                 baseMessage = '⚡ Indica tu destino y prepárate para llegar a tiempo.';
             } else if (selectedMoods.has('chill')) {
@@ -1422,6 +1664,32 @@
             window.location.href = 'index.html';
         }
 
+        let originCoordsValue = null;
+        let destinationCoordsValue = null;
+        let passengerMap = null;
+        let originMarker = null;
+        let destinationMarker = null;
+        let selectionMode = 'origin';
+        let passengerGeocoder = null;
+
+        function loadGoogleMapsScript(callbackName) {
+            if (window.google && window.google.maps) {
+                window[callbackName]();
+                return;
+            }
+
+            const existingScript = document.querySelector('script[data-google-maps]');
+            if (existingScript) return;
+
+            const apiKey = document.body.dataset.googleMapsKey || window.GOOGLE_MAPS_API_KEY || '';
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`;
+            script.async = true;
+            script.defer = true;
+            script.dataset.googleMaps = 'true';
+            document.head.appendChild(script);
+        }
+
         // Lógica de Google Maps embebido
         function initMap() {
             if (mapFrame) {
@@ -1448,6 +1716,129 @@
             }
 
             return `${baseUrl}?${params.toString()}`;
+        }
+
+        function setLocationLabel(fieldId, fallbackLabel, coords) {
+            const input = document.getElementById(fieldId);
+            if (!input) return;
+            if (!passengerGeocoder) {
+                input.value = fallbackLabel;
+                return;
+            }
+            passengerGeocoder.geocode({ location: { lat: coords.lat, lng: coords.lon } }, (results, status) => {
+                if (status === 'OK' && results && results[0]) {
+                    input.value = results[0].formatted_address;
+                } else {
+                    input.value = fallbackLabel;
+                }
+            });
+        }
+
+        function updateSelectionMode(mode) {
+            selectionMode = mode;
+            if (selectOriginBtn && selectDestinationBtn) {
+                selectOriginBtn.classList.toggle('active', mode === 'origin');
+                selectDestinationBtn.classList.toggle('active', mode === 'destination');
+            }
+        }
+
+        function initSelectionMap() {
+            if (!passengerSelectMap || passengerMap) return;
+
+            if (!window.google || !window.google.maps) {
+                showToast('Google Maps no está disponible. Configura la API key.', false);
+                return;
+            }
+
+            passengerGeocoder = new google.maps.Geocoder();
+            passengerMap = new google.maps.Map(passengerSelectMap, {
+                center: { lat: -1.65, lng: -78.68 },
+                zoom: 13,
+                mapTypeControl: false,
+                streetViewControl: false
+            });
+
+            passengerMap.addListener('click', (event) => {
+                const coords = {
+                    lat: event.latLng.lat(),
+                    lon: event.latLng.lng()
+                };
+
+                if (selectionMode === 'origin') {
+                    originCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
+                    if (originMarker) {
+                        originMarker.setPosition({ lat: coords.lat, lng: coords.lon });
+                    } else {
+                        originMarker = new google.maps.Marker({
+                            position: { lat: coords.lat, lng: coords.lon },
+                            map: passengerMap,
+                            label: 'O'
+                        });
+                    }
+                    setLocationLabel('origen', 'Origen seleccionado', coords);
+                    updateSelectionMode('destination');
+                } else {
+                    destinationCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
+                    if (destinationMarker) {
+                        destinationMarker.setPosition({ lat: coords.lat, lng: coords.lon });
+                    } else {
+                        destinationMarker = new google.maps.Marker({
+                            position: { lat: coords.lat, lng: coords.lon },
+                            map: passengerMap,
+                            label: 'D'
+                        });
+                    }
+                    setLocationLabel('destino', 'Destino seleccionado', coords);
+                }
+
+                updateRoutePreview();
+            });
+        }
+
+        function parseCoords(textValue) {
+            if (!textValue) return null;
+            const match = textValue.match(/-?\d+(\.\d+)?/g);
+            if (!match || match.length < 2) return null;
+            return { lat: parseFloat(match[0]), lon: parseFloat(match[1]) };
+        }
+
+        function buildRoutePreviewUrl(originValue, destinationValue) {
+            const baseUrl = 'https://maps.google.com/maps';
+            const params = new URLSearchParams({
+                hl: 'es',
+                t: 'm',
+                z: '14',
+                output: 'embed'
+            });
+
+            if (originValue && destinationValue) {
+                params.set('f', 'd');
+                params.set('source', 's_d');
+                params.set('saddr', originValue);
+                params.set('daddr', destinationValue);
+            } else if (originValue) {
+                params.set('q', originValue);
+            }
+
+            return `${baseUrl}?${params.toString()}`;
+        }
+
+        function updateRoutePreview() {
+            if (!routePreviewFrame) return;
+            const originInput = document.getElementById('origen').value.trim();
+            const destinationInput = document.getElementById('destino').value.trim();
+            const originCoords = parseCoords(originCoordsValue);
+            const destinationCoords = parseCoords(destinationCoordsValue);
+            const originValue = originCoords ? `${originCoords.lat},${originCoords.lon}` : originInput;
+            const destinationValue = destinationCoords ? `${destinationCoords.lat},${destinationCoords.lon}` : destinationInput;
+
+            if (!originValue && !destinationValue) {
+                routePreviewFrame.classList.remove('active');
+                return;
+            }
+
+            routePreviewFrame.src = buildRoutePreviewUrl(originValue, destinationValue);
+            routePreviewFrame.classList.add('active');
         }
 
         function updateMapEmbed() {
@@ -1527,6 +1918,18 @@
             }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
         }
 
+        function activateTripView() {
+            requestPanel.style.display = 'none';
+            activeTripPanel.style.display = 'block';
+            mapElement.classList.add('active');
+
+            shareLocationContainer.style.display = 'flex';
+            if (shareLocationBtn) {
+                shareLocationBtn.disabled = false;
+                passengerLocationStatus.innerText = 'Envía tu ubicación para que el conductor pueda navegar hacia ti.';
+            }
+        }
+
         // Lógica de solicitud de viaje y estado (polling)
         async function checkTripStatus() {
             if (!currentTripId) return;
@@ -1544,9 +1947,7 @@
                     clearInterval(pollingStatusInterval);
                     pollingStatusInterval = null;
 
-                    requestPanel.style.display = 'none'; 
-                    activeTripPanel.style.display = 'block'; 
-                    mapElement.classList.add('active'); 
+                    activateTripView();
                     
                     currentDriverName = data.driver;
                     document.getElementById('activeTripDriverName').innerText = currentDriverName;
@@ -1561,17 +1962,22 @@
                         favoriteBadge.style.display = 'inline';
                     }
 
-                    shareLocationContainer.style.display = 'flex';
-                    if (shareLocationBtn) {
-                        shareLocationBtn.disabled = false;
-                        passengerLocationStatus.innerText = 'Envía tu ubicación para que el conductor pueda navegar hacia ti.';
-                    }
                     updateMapEmbed();
                     startChatSession(currentTripId);
                     startDriverLocationPolling(currentTripId);
 
                 } else if (data.status === 'pendiente') {
                     messageArea.innerText = "🔄 Esperando que un conductor acepte la oferta...";
+                    counterofferPanel.classList.remove('active');
+                } else if (data.status === 'contraoferta') {
+                    if (data.counterOffer) {
+                        counterofferText.innerText = `🚗 ${data.counterOffer.driverName} propone $${Number(data.counterOffer.amount).toFixed(2)} por el viaje.`;
+                    }
+                    if (data.offerPrice) {
+                        reofferPriceInput.value = Number(data.offerPrice).toFixed(2);
+                    }
+                    counterofferPanel.classList.add('active');
+                    messageArea.innerText = "💬 Tienes una contraoferta del conductor. Responde para continuar.";
                 } else if (data.status === 'finalizado') {
                     // VIAJE finalizado AUTOMÁTICAMENTE
                     clearInterval(pollingStatusInterval);
@@ -1621,18 +2027,82 @@
             }, 3000); 
         }
 
+        fareChips.forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const value = chip.dataset.value;
+                offerPriceInput.value = value;
+                fareChips.forEach((btn) => btn.classList.remove('active'));
+                chip.classList.add('active');
+            });
+        });
+
+        previewRouteBtn.addEventListener('click', () => {
+            updateRoutePreview();
+        });
+
+        if (selectOriginBtn) {
+            selectOriginBtn.addEventListener('click', () => updateSelectionMode('origin'));
+        }
+
+        if (selectDestinationBtn) {
+            selectDestinationBtn.addEventListener('click', () => updateSelectionMode('destination'));
+        }
+
+        useLocationBtn.addEventListener('click', () => {
+            if (!navigator.geolocation) {
+                showToast('Tu navegador no soporta geolocalización.', false);
+                return;
+            }
+
+            useLocationBtn.disabled = true;
+            navigator.geolocation.getCurrentPosition(position => {
+                const coords = {
+                    lat: position.coords.latitude,
+                    lon: position.coords.longitude
+                };
+                originCoordsValue = `Lat: ${coords.lat}, Lon: ${coords.lon}`;
+                setLocationLabel('origen', 'Ubicación actual', coords);
+                if (originMarker && passengerMap) {
+                    originMarker.setPosition({ lat: coords.lat, lng: coords.lon });
+                } else if (passengerMap) {
+                    originMarker = new google.maps.Marker({
+                        position: { lat: coords.lat, lng: coords.lon },
+                        map: passengerMap,
+                        label: 'O'
+                    });
+                }
+                if (passengerMap) {
+                    passengerMap.setCenter({ lat: coords.lat, lng: coords.lon });
+                    passengerMap.setZoom(14);
+                }
+                updateSelectionMode('destination');
+                updateRoutePreview();
+                showToast('Ubicación detectada ✅', true);
+                useLocationBtn.disabled = false;
+            }, () => {
+                showToast('No se pudo obtener tu ubicación.', false);
+                useLocationBtn.disabled = false;
+            }, { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 });
+        });
+
         requestRideBtn.addEventListener('click', async () => {
             const origin = document.getElementById('origen').value.trim();
             const destination = document.getElementById('destino').value.trim();
             const paymentMethod = document.getElementById('paymentMethod').value;
+            const offerPrice = parseFloat(offerPriceInput.value);
 
-            if (!origin || !destination) {
-                messageArea.innerText = "🚨 Ingresa origen y destino.";
+            if (!originCoordsValue || !destinationCoordsValue) {
+                messageArea.innerText = "🚨 Selecciona origen y destino en el mapa.";
+                return;
+            }
+            if (Number.isNaN(offerPrice) || offerPrice <= 0) {
+                messageArea.innerText = "🚨 Ingresa una oferta válida para negociar.";
                 return;
             }
 
             requestRideBtn.disabled = true;
-            requestRideBtn.innerText = 'Enviando solicitud...';
+            requestRideBtn.innerText = 'Enviando oferta...';
+            counterofferPanel.classList.remove('active');
 
             try {
                 const res = await fetch(`${API}/trips/request`, {
@@ -1647,21 +2117,117 @@
                         passengerEmail: userEmail,
                         origin, 
                         destination, 
-                        paymentMethod 
+                        paymentMethod,
+                        offerPrice,
+                        originCoords: originCoordsValue,
+                        destinationCoords: destinationCoordsValue
                     })
                 });
                 const data = await res.json();
-                
+
                 currentTripId = data.tripId;
-                
+
                 messageArea.innerText = data.message;
+                if (estimatedPrice) {
+                    estimatedPrice.innerText = `$${offerPrice.toFixed(2)}`;
+                }
                 requestRideBtn.innerText = 'Buscando conductor... 🔄';
                 pollingStatusInterval = setInterval(checkTripStatus, 4000); 
 
             } catch (error) {
                 messageArea.innerText = "❌ Error al solicitar el viaje.";
                 requestRideBtn.disabled = false;
-                requestRideBtn.innerText = 'Solicitar Viaje 🚀';
+                requestRideBtn.innerText = 'Enviar oferta de viaje';
+            }
+        });
+
+        acceptCounterBtn.addEventListener('click', async () => {
+            if (!currentTripId) return;
+            acceptCounterBtn.disabled = true;
+
+            try {
+                const res = await fetch(`${API}/trips/accept-counteroffer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    },
+                    body: JSON.stringify({
+                        tripId: currentTripId,
+                        passengerEmail: userEmail
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    messageArea.innerText = data.message || 'No se pudo aceptar la contraoferta.';
+                    acceptCounterBtn.disabled = false;
+                    return;
+                }
+
+                clearInterval(pollingStatusInterval);
+                pollingStatusInterval = null;
+                counterofferPanel.classList.remove('active');
+
+                const trip = data.trip;
+                currentDriverName = trip.driver;
+                document.getElementById('activeTripDriverName').innerText = currentDriverName;
+                document.getElementById('activeTripOriginDisplay').innerText = trip.origin;
+                document.getElementById('activeTripDestinationDisplay').innerText = trip.destination;
+                if (estimatedPrice && trip.offerPrice) {
+                    estimatedPrice.innerText = `$${Number(trip.offerPrice).toFixed(2)}`;
+                }
+
+                activateTripView();
+                updateMapEmbed();
+                startChatSession(currentTripId);
+                startDriverLocationPolling(currentTripId);
+            } catch (error) {
+                console.error('Error al aceptar contraoferta:', error);
+                messageArea.innerText = '❌ No se pudo aceptar la contraoferta.';
+            } finally {
+                acceptCounterBtn.disabled = false;
+            }
+        });
+
+        sendReofferBtn.addEventListener('click', async () => {
+            if (!currentTripId) return;
+            const newOffer = parseFloat(reofferPriceInput.value);
+
+            if (Number.isNaN(newOffer) || newOffer <= 0) {
+                messageArea.innerText = '🚨 Ingresa una nueva oferta válida.';
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API}/trips/reoffer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    },
+                    body: JSON.stringify({
+                        tripId: currentTripId,
+                        passengerEmail: userEmail,
+                        newOffer
+                    })
+                });
+                const data = await res.json();
+
+                if (!res.ok) {
+                    messageArea.innerText = data.message || 'No se pudo enviar la nueva oferta.';
+                    return;
+                }
+
+                offerPriceInput.value = newOffer.toFixed(2);
+                fareChips.forEach((btn) => btn.classList.remove('active'));
+                counterofferPanel.classList.remove('active');
+                messageArea.innerText = '🔄 Oferta actualizada. Esperando respuesta del conductor.';
+            } catch (error) {
+                console.error('Error al enviar nueva oferta:', error);
+                messageArea.innerText = '❌ No se pudo enviar la nueva oferta.';
             }
         });
 
@@ -1679,10 +2245,28 @@
             activeTripPanel.style.display = 'none';
             mapElement.classList.remove('active');
             requestRideBtn.disabled = false;
-            requestRideBtn.innerText = 'Solicitar Viaje 🚀';
-            messageArea.innerText = '💫 Ingresa tu destino y viaja con los mejores conductores';
+            requestRideBtn.innerText = 'Enviar oferta de viaje';
+            messageArea.innerText = '💫 Negocia tu tarifa y elige al conductor ideal para tu ruta.';
             updateMoodMessage(true);
+            counterofferPanel.classList.remove('active');
             shareLocationContainer.style.display = 'none';
+            originCoordsValue = null;
+            destinationCoordsValue = null;
+            document.getElementById('origen').value = '';
+            document.getElementById('destino').value = '';
+            if (originMarker) {
+                originMarker.setMap(null);
+                originMarker = null;
+            }
+            if (destinationMarker) {
+                destinationMarker.setMap(null);
+                destinationMarker = null;
+            }
+            updateSelectionMode('origin');
+            if (routePreviewFrame) {
+                routePreviewFrame.classList.remove('active');
+                routePreviewFrame.removeAttribute('src');
+            }
             if (shareLocationBtn) {
                 shareLocationBtn.disabled = false;
                 passengerLocationStatus.innerText = 'Tu ubicación ayuda al conductor a encontrarte más rápido.';
@@ -2050,9 +2634,14 @@
             }
         }
 
+        window.initPassengerMaps = () => {
+            initMap();
+            initSelectionMap();
+        };
+
         // Inicialización
         document.addEventListener('DOMContentLoaded', () => {
-            initMap();
+            loadGoogleMapsScript('initPassengerMaps');
             loadPassengerProfilePhoto();
             setupVoiceRecognition();
             // Reanudar viaje, historial, etc...
