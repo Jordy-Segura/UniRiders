@@ -1764,10 +1764,15 @@
                 const res = await fetch(`${API}/trips/offers`, {
                     headers: {
                         'user-email': userEmail,
+                        'user-role': userRole || 'conductor',
                         'session-id': sessionId
                     }
                 });
-                const offers = await res.json();
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || 'No se pudieron obtener las ofertas');
+                }
+                const offers = Array.isArray(data) ? data : [];
                 
                 offersList.innerHTML = '';
 
@@ -1832,7 +1837,8 @@
 
             } catch (error) {
                 console.error("Error al obtener ofertas:", error);
-                offersList.innerHTML = '<div class="no-offers">❌ Error al cargar ofertas.</div>';
+                const message = error.message || 'Error al cargar ofertas.';
+                offersList.innerHTML = `<div class="no-offers">❌ ${message}</div>`;
             }
         }
 

@@ -74,6 +74,19 @@ function showToast(msg, success = true) {
   setTimeout(() => toast.classList.remove("show"), 3000);
 }
 
+function formatActiveSessionMessage(data) {
+  if (!data) return "Sesión activa en otro dispositivo.";
+  const session = data.activeSession;
+  if (!session) return data.message || "Sesión activa en otro dispositivo.";
+  const device = session.device || "dispositivo desconocido";
+  const ip = session.ip ? `IP ${session.ip}` : null;
+  const lastActive = session.lastActive
+    ? new Date(session.lastActive).toLocaleString('es-EC', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
+  const details = [device, ip, lastActive ? `Última actividad: ${lastActive}` : null].filter(Boolean).join(' • ');
+  return `${data.message || 'Ya existe una sesión activa.'} ${details ? `(${details})` : ''}`.trim();
+}
+
 function createSessionFromAuth(data) {
   const sessionId = data.sessionId || ('session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
   localStorage.setItem(sessionId + '_userEmail', data.userEmail);
@@ -319,7 +332,11 @@ loginForm.addEventListener("submit", async e => {
     });
     const data = await res.json();
 
-    showToast(data.message, res.ok);
+    if (res.ok) {
+      showToast(data.message, true);
+    } else {
+      showToast(formatActiveSessionMessage(data), false);
+    }
 
     if (res.ok) {
         if (document.getElementById("rememberMe")?.checked) {
@@ -394,7 +411,11 @@ if (adminRequestCodeBtn) {
       });
 
       const data = await res.json();
-      showToast(data.message, res.ok);
+      if (res.ok) {
+        showToast(data.message, true);
+      } else {
+        showToast(formatActiveSessionMessage(data), false);
+      }
 
       if (res.ok) {
         adminAccessEmailNormalized = normalizedEmail;
@@ -436,7 +457,11 @@ if (adminVerifyCodeBtn) {
       });
 
       const data = await res.json();
-      showToast(data.message, res.ok);
+      if (res.ok) {
+        showToast(data.message, true);
+      } else {
+        showToast(formatActiveSessionMessage(data), false);
+      }
 
       if (res.ok) {
         const sessionId = createSessionFromAuth(data);

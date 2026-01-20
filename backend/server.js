@@ -66,11 +66,34 @@ function sanitizePhoneNumber(phone) {
     return digits.length ? digits : null;
 }
 
-function registerSession(email) {
+function parseDeviceInfo(userAgent = '') {
+    const ua = userAgent.toLowerCase();
+    if (ua.includes('iphone') || ua.includes('ipad')) return 'iOS (Safari)';
+    if (ua.includes('android')) return 'Android';
+    if (ua.includes('windows')) return 'Windows';
+    if (ua.includes('mac os') || ua.includes('macintosh')) return 'macOS';
+    if (ua.includes('linux')) return 'Linux';
+    return 'Dispositivo desconocido';
+}
+
+function buildSessionSnapshot(session) {
+    if (!session) return null;
+    return {
+        device: session.device,
+        ip: session.ip,
+        lastActive: session.lastActive
+    };
+}
+
+function registerSession(email, req) {
     const sessionId = crypto.randomBytes(16).toString('hex');
+    const userAgent = req?.headers?.['user-agent'] || '';
     activeSessions.set(normalizeEmail(email), {
         sessionId,
-        lastActive: Date.now()
+        lastActive: Date.now(),
+        userAgent,
+        device: parseDeviceInfo(userAgent),
+        ip: req?.ip || req?.headers?.['x-forwarded-for'] || 'desconocida'
     });
     return sessionId;
 }
@@ -110,7 +133,10 @@ app.use((req, res, next) => {
 
     const session = activeSessions.get(email);
     if (!session || session.sessionId !== sessionId) {
-        return res.status(401).json({ message: "Sesión activa en otro dispositivo" });
+        return res.status(401).json({
+            message: "Sesión activa en otro dispositivo",
+            activeSession: buildSessionSnapshot(session)
+        });
     }
 
     session.lastActive = Date.now();
@@ -629,10 +655,18 @@ app.post("/api/login", async (req, res) => {
             return res.status(401).json({ message: "Credenciales incorrectas" });
         }
 
+        const existingSession = activeSessions.get(normalizeEmail(user.email));
+        if (existingSession) {
+            return res.status(409).json({
+                message: "Ya existe una sesión activa. Cierra sesión en el otro dispositivo.",
+                activeSession: buildSessionSnapshot(existingSession)
+            });
+        }
+
         // Actualizar usuario activo
         appStatistics.activeUsers++;
 
-        const sessionId = registerSession(user.email);
+        const sessionId = registerSession(user.email, req);
 
         res.json({ 
             message: "Login exitoso", 
@@ -730,7 +764,15 @@ app.post("/api/admin/verify-code", async (req, res) => {
         const adminRecord = adminLookup.recordset[0];
         verificationCodes.delete(normalizedEmail);
 
-        const sessionId = registerSession(adminRecord.email);
+        const existingSession = activeSessions.get(normalizeEmail(adminRecord.email));
+        if (existingSession) {
+            return res.status(409).json({
+                message: "Ya existe una sesión activa. Cierra sesión en el otro dispositivo.",
+                activeSession: buildSessionSnapshot(existingSession)
+            });
+        }
+
+        const sessionId = registerSession(adminRecord.email, req);
         res.json({
             message: "Acceso concedido",
             userEmail: adminRecord.email,
@@ -990,14 +1032,42 @@ app.delete("/api/admin/users/:email", requireAdmin, async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        const result = await pool.request()
-            .input("email", sql.NVarChar, normalizedTargetEmail)
-            .query("DELETE FROM Usuarios WHERE LOWER(email) = @email");
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("email", sql.NVarChar, normalizedTargetEmail);
+
+        await request.query(`
+            DELETE FROM HistorialChat
+            WHERE id_viaje IN (
+                SELECT id_viaje FROM Viajes
+                WHERE pasajero_email = @email OR conductor_email = @email
+            )
+        `);
+        await request.query(`
+            DELETE FROM Viajes
+            WHERE pasajero_email = @email OR conductor_email = @email
+        `);
+        await request.query(`
+            DELETE FROM Vehiculos
+            WHERE email_conductor = @email
+        `);
+        await request.query(`
+            DELETE FROM EmailVerifications
+            WHERE LOWER(email) = @email
+        `);
+        const result = await request.query(`
+            DELETE FROM Usuarios WHERE LOWER(email) = @email
+        `);
 
         if (result.rowsAffected[0] === 0) {
+            await transaction.rollback();
             return res.status(404).json({ message: "Usuario no encontrado" });
         }
 
+        await transaction.commit();
+        activeSessions.delete(normalizedTargetEmail);
         res.json({ message: "Usuario eliminado" });
     } catch (err) {
         res.status(500).json({ message: "Error al eliminar usuario" });
