@@ -17,8 +17,6 @@ const fs = require('fs');
 const { sendRecoveryMail, sendVerificationMail, sendAdminLoginMail } = require('./mailer');
 const https = require('https');
 
-const PORT = process.env.PORT || 3000;
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -1878,7 +1876,7 @@ app.post("/api/chat/:tripId/send", (req, res) => {
     globalChatMessages[tripId].push(newMessage);
     
     // Guardar en base de datos también
-    fetch(`http://localhost:${PORT}/api/chat/${tripId}/save`, {
+    fetch(`http://localhost:${API_PORT}/api/chat/${tripId}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sender, message: sanitizedMessage, type })
@@ -2550,6 +2548,7 @@ if (require.main === module) {
     // Actualizar estadísticas periódicamente
     setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
+    const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
         console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
     });
