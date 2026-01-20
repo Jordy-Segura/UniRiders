@@ -82,6 +82,56 @@ body {
     margin-bottom: 30px;
 }
 
+.map-picker {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 16px;
+    border-radius: 16px;
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.map-picker__header h4 {
+    margin-bottom: 6px;
+}
+
+.map-picker__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.map-picker__btn {
+    flex: 1;
+    min-width: 140px;
+}
+
+.map-picker__btn--active {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+
+.map-picker__btn--secondary {
+    background: rgba(0, 114, 255, 0.8);
+}
+
+.map-picker__btn--ghost {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.map-picker__map {
+    width: 100%;
+    height: 260px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.map-picker__summary {
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: #f1f1f1;
+}
+
 .search-form input, .search-form select, .search-btn {
     padding: 12px;
     border-radius: 10px;
@@ -182,6 +232,14 @@ body {
     outline: none;
 }
 
+@media (max-width: 520px) {
+    .search-form input,
+    .search-form select,
+    .chat-input-group input {
+        font-size: 16px;
+    }
+}
+
 .driver-info-panel {
     background: rgba(0, 0, 0, 0.2);
     padding: 15px;
@@ -189,4 +247,57 @@ body {
     margin-top: 20px;
     text-align: left;
     color: #eee;
+}
+
+@media (max-width: 768px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        padding: 16px 0 32px;
+    }
+
+    .main-panel {
+        padding: 22px;
+        width: 94%;
+    }
+
+    #map {
+        height: 260px;
+    }
+
+    .map-picker__map {
+        height: 230px;
+    }
+
+    .chat-input-group {
+        flex-direction: column;
+    }
+
+    .chat-input-group input {
+        width: 100%;
+    }
+
+    .search-form input,
+    .search-form select,
+    .search-btn {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-panel {
+        padding: 18px;
+    }
+
+    #map {
+        height: 220px;
+    }
+
+    .map-picker__map {
+        height: 200px;
+    }
+
+    .logout-btn {
+        width: 100%;
+    }
 }
