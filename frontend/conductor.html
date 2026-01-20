@@ -108,28 +108,6 @@
             font-weight: 600;
             font-size: 0.85em;
         }
-        .negotiation-panel {
-            background: rgba(255, 255, 255, 0.12);
-            border-radius: 14px;
-            padding: 14px 16px;
-            margin-bottom: 16px;
-        }
-        .negotiation-panel h4 {
-            margin-bottom: 6px;
-        }
-        .negotiation-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 10px;
-        }
-        .negotiation-tag {
-            background: rgba(255, 255, 255, 0.18);
-            border-radius: 999px;
-            padding: 6px 12px;
-            font-weight: 600;
-            font-size: 0.85em;
-        }
         .offers-list {
             max-height: 250px; 
             overflow-y: auto;
@@ -1796,7 +1774,12 @@
                     const baseOffer = Number(offer.offerPrice || 0);
                     const offerLabel = baseOffer > 0 ? `$${baseOffer.toFixed(2)}` : 'Sin oferta';
 
-                    const mapsLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(offer.origin)}&destination=${encodeURIComponent(offer.destination)}`;
+                    const originCoords = parseCoordsFromText(offer.originCoords);
+                    const destinationCoords = parseCoordsFromText(offer.destinationCoords);
+                    const originValue = originCoords ? `${originCoords.lat},${originCoords.lon}` : offer.origin;
+                    const destinationValue = destinationCoords ? `${destinationCoords.lat},${destinationCoords.lon}` : offer.destination;
+                    const mapsLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originValue)}&destination=${encodeURIComponent(destinationValue)}`;
+                    const routeLabel = originCoords && destinationCoords ? 'Ruta marcada en Google Maps' : 'Ruta aproximada';
 
                     card.innerHTML = `
                         <h4>🏍️ Viaje ID: ${offer.id} <span style="font-weight: 400; font-size: 0.9em;">(${offer.timestamp})</span></h4>
@@ -1805,7 +1788,7 @@
                         <p>🏁 A: <strong>${offer.destination}</strong></p>
                         <p>👤 Pasajero: ${offer.passenger} | 💰 Pago: <strong>${offer.payment}</strong></p>
                         <a class="map-link" href="${mapsLink}" target="_blank" rel="noopener">
-                            <i class="fas fa-map-location-dot"></i> Ver ruta en Google Maps
+                            <i class="fas fa-map-location-dot"></i> ${routeLabel}
                         </a>
                         <div class="offer-actions">
                             <button class="accept-btn" onclick="acceptTrip(${offer.id})">✅ Aceptar Viaje</button>

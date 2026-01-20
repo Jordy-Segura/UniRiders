@@ -600,6 +600,12 @@ app.post("/api/admin/request-code", async (req, res) => {
         return res.status(400).json({ message: "Solo se permiten correos Gmail para administradores" });
     }
 
+    if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({
+            message: "No se pudo enviar el código. Configura RESEND_API_KEY y RESEND_FROM en el servidor."
+        });
+    }
+
     try {
         const pool = await poolPromise;
         const adminLookup = await pool.request()
