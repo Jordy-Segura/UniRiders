@@ -145,7 +145,13 @@ async function loadProfileData() {
     }
     
     try {
-        const res = await fetch(`${API}/profile/${userEmail}`);
+        const res = await fetch(`${API}/profile/${userEmail}`, {
+            headers: {
+                'user-email': userEmail,
+                'user-role': userRole || 'pasajero',
+                'session-id': sessionId || ''
+            }
+        });
         const data = await res.json();
 
         if (data.user) {
