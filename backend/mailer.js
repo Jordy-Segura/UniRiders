@@ -43,7 +43,106 @@ transporter.verify(function (error) {
     } else {
         console.log("✅ Servidor de correo listo");
     }
-});
+
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            }
+        });
+        console.log('✅ Correo enviado (SMTP):', info.messageId);
+        return true;
+    } catch (error) {
+        console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
+
+async function sendWithResend({ to, subject, text, html }) {
+    if (!resend) {
+        return null;
+    }
+
+    const primary = await resend.emails.send({
+        from: FROM,
+        to,
+        subject,
+        text,
+        html
+    });
+
+    if (!primary.error) {
+        console.log("✅ Correo enviado (Resend):", primary.data?.id || "OK");
+        return true;
+    }
+
+    console.log("❌ Error enviando correo (Resend):", primary.error);
+    const errorMessage = typeof primary.error === "string" ? primary.error : JSON.stringify(primary.error);
+
+    if (errorMessage.includes("domain is not verified")) {
+        const fallback = await resend.emails.send({
+            from: FALLBACK_FROM,
+            to,
+            subject,
+            text,
+            html
+        });
+
+        if (!fallback.error) {
+            console.log("✅ Correo enviado (Resend fallback):", fallback.data?.id || "OK");
+            return true;
+        }
+
+        console.log("❌ Error enviando correo (Resend fallback):", fallback.error);
+        return false;
+    }
+
+    return false;
+}
+
+async function sendWithSmtp({ to, subject, text, html }) {
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                "X-Priority": "1",
+                "X-MSMail-Priority": "High",
+                "Importance": "high"
+            }
+        });
+        console.log("✅ Correo enviado (SMTP):", info.messageId);
+        return true;
+    } catch (error) {
+        console.log("❌ Error enviando correo (SMTP):", error);
+        return false;
+    }
+}
+
+async function sendEmail({ to, subject, text, html }) {
+    if (resend) {
+        try {
+            const sent = await sendWithResend({ to, subject, text, html });
+            if (sent !== null) {
+                return sent;
+            }
+        } catch (error) {
+            console.log("❌ Error enviando correo (Resend):", error);
+        }
+    }
+
+    return sendWithSmtp({ to, subject, text, html });
+}
 
 async function sendWithResend({ to, subject, text }) {
     if (!resend) {
@@ -208,10 +307,30 @@ async function sendAdminLoginMail(to, code) {
         recentEmails.delete(to);
         return false;
     }
+    recentEmails.set(to, now);
+
+    const subject = `Código de acceso administrador - ${code}`;
+    const text =
+      `Tu código de acceso administrador es: ${code}\n\n` +
+      `Este código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`;
+
+    const html = `<p>Tu código de acceso administrador es: <b>${code}</b></p><p>Expira en 10 minutos.</p>`;
+
+    console.log("📧 (Resend) Enviando admin code a:", to);
+    const info = await sendEmail({ to, subject, text, html });
+    console.log("✅ Código administrador enviado (Resend):", info?.id || info);
+
+    setTimeout(() => recentEmails.delete(to), 60 * 60 * 1000);
+    return true;
+  } catch (error) {
+    console.log("❌ Error enviando código administrador (Resend):", error.message || error);
+    recentEmails.delete(to);
+    return false;
+  }
 }
 
 module.exports = {
-    sendRecoveryMail,
-    sendVerificationMail,
-    sendAdminLoginMail
+  sendRecoveryMail,
+  sendVerificationMail,
+  sendAdminLoginMail
 };
