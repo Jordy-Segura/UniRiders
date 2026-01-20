@@ -20,6 +20,15 @@
   font-family: 'Poppins', sans-serif;
 }
 
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
 body {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--color-azul), var(--color-celeste));
@@ -28,6 +37,30 @@ body {
   align-items: center;
   padding: 20px 0;
   transition: background 0.6s ease;
+}
+
+/* =========================================================
+   EFECTOS DE FONDO Y ELEMENTOS DE LA LANDING
+   ========================================================= */
+.particles {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, #0072ff, #00c6ff);
+}
+
+.particle {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: float 15s infinite linear;
+}
+
+@keyframes float {
+  0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
 }
 
 .theme-toggle {
@@ -109,10 +142,44 @@ body.dark-mode .floating-illustration .fa-motorcycle {
   opacity: 0.7;
 }
 
+.animated-ripple--primary {
+  width: 220px;
+  height: 220px;
+  right: 8%;
+  bottom: 6%;
+}
+
+.animated-ripple--secondary {
+  width: 320px;
+  height: 320px;
+  right: 4%;
+  bottom: 3%;
+  animation-delay: 4s;
+}
+
 @keyframes ripple {
   0% { transform: scale(0.9); opacity: 0.4; }
   50% { opacity: 0.8; }
   100% { transform: scale(1.6); opacity: 0; }
+}
+
+.live-stats {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 15px;
+  border-radius: 15px;
+  backdrop-filter: blur(10px);
+  color: var(--color-blanco);
+  font-size: 0.9em;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 5px 0;
 }
 
 /* =========================================================
@@ -143,6 +210,23 @@ body.dark-mode .floating-illustration .fa-motorcycle {
   min-height: 400px;
 }
 
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  transform: rotate(45deg);
+  animation: shine 3s infinite;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) rotate(45deg); }
+}
+
 .auth-card p {
   color: #555;
   margin-bottom: 20px;
@@ -157,6 +241,7 @@ body.dark-mode .floating-illustration .fa-motorcycle {
   margin-bottom: 15px;
   padding: 0 10px;
   transition: 0.3s;
+  position: relative;
 }
 
 .auth-card .input-container:focus-within {
@@ -177,6 +262,48 @@ body.dark-mode .floating-illustration .fa-motorcycle {
   padding: 12px 0;
   outline: none;
   font-size: 14px;
+}
+
+.input-focus-effect {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--color-azul), var(--color-celeste));
+  transition: width 0.3s ease;
+}
+
+.input-container:focus-within .input-focus-effect {
+  width: 100%;
+}
+
+.password-strength {
+  height: 4px;
+  background: #eee;
+  border-radius: 2px;
+  margin-top: 5px;
+  overflow: hidden;
+}
+
+.strength-bar {
+  height: 100%;
+  width: 0%;
+  transition: all 0.3s ease;
+  border-radius: 2px;
+}
+
+.strength-weak { background: #ff4444; width: 33%; }
+.strength-medium { background: #ffaa00; width: 66%; }
+.strength-strong { background: #00c851; width: 100%; }
+
+.security-tips {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 10px;
+  border-radius: 10px;
+  margin-top: 15px;
+  font-size: 0.8em;
+  border-left: 3px solid var(--color-celeste);
 }
 
 /* --- BOTÓN SWITCH --- */
@@ -263,6 +390,58 @@ body.dark-mode .floating-illustration .fa-motorcycle {
 
 .forgot-link:hover {
   color: #0056b3;
+}
+
+.landing-subtitle {
+  color: var(--color-blanco);
+  margin-bottom: 20px;
+  font-size: 0.9em;
+}
+
+.auth-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.auth-meta label {
+  color: #666;
+  font-size: 0.9em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-access-link {
+  text-align: center;
+  margin-top: 15px;
+}
+
+.terms-wrapper {
+  margin: 15px 0;
+}
+
+.terms-label {
+  color: #666;
+  font-size: 0.8em;
+}
+
+.terms-label a {
+  color: var(--color-azul);
+}
+
+.section-divider {
+  margin: 20px 0;
+  border-color: var(--color-gris-claro);
+}
+
+.centered-link {
+  text-align: center;
+  display: block;
+  margin-top: 15px;
 }
 
 /* --- SELECTOR DE ROL --- */
@@ -771,4 +950,76 @@ body.dark-mode .live-stats {
   color: #666;
   margin-top: 5px;
   text-align: center;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 900px) {
+  .floating-illustration--left {
+    inset: 8% auto auto 4%;
+  }
+
+  .floating-illustration {
+    inset: auto 6% 6% auto;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    padding: 16px 0 28px;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .auth-card {
+    padding: 24px;
+    min-height: auto;
+  }
+
+  .auth-form {
+    left: 20px;
+    right: 20px;
+  }
+
+  .live-stats {
+    position: static;
+    width: min(92%, 360px);
+    margin: 0 auto;
+    order: 2;
+  }
+
+  .auth-container {
+    order: 1;
+  }
+
+  .floating-illustration,
+  .animated-ripple {
+    display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .theme-toggle {
+    width: 44px;
+    height: 44px;
+    top: 12px;
+    right: 12px;
+    font-size: 1.1em;
+  }
+
+  .button-switcher {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .auth-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .field-group {
+    flex-direction: column;
+  }
 }
