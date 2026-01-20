@@ -1,5 +1,9 @@
 const nodemailer = require("nodemailer");
 
+const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
+const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+console.log("RESEND_FROM =", process.env.RESEND_FROM);
+
 function normalizeEmailValue(value) {
     return value ? String(value).trim().toLowerCase() : '';
 }
@@ -40,6 +44,60 @@ transporter.verify(function (error, success) {
     }
 });
 
+async function sendEmail({ to, subject, text, html }) {
+    if (RESEND_API_KEY) {
+        try {
+            const response = await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${RESEND_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    from: FROM,
+                    to,
+                    subject,
+                    text,
+                    html
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                console.log("❌ Error enviando correo (Resend):", payload);
+                return false;
+            }
+
+            console.log("✅ Correo enviado (Resend):", payload.id || "OK");
+            return true;
+        } catch (error) {
+            console.log("❌ Error enviando correo (Resend):", error);
+            return false;
+        }
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            }
+        });
+        console.log('✅ Correo enviado (SMTP):', info.messageId);
+        return true;
+    } catch (error) {
+        console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
+
 async function sendRecoveryMail(to, code) {
     try {
         // Verificar que sea correo ESPOCH
@@ -60,10 +118,6 @@ async function sendRecoveryMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: {
-                name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
-            },
             to: to,
             subject: `Código de Verificación UniRiders - ${code}`,
             text: `Tu código de verificación para UniRiders es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
@@ -126,17 +180,14 @@ async function sendRecoveryMail(to, code) {
     </div>
 </body>
 </html>
-            `,
-            headers: {
-                'X-Priority': '1',
-                'X-MSMail-Priority': 'High',
-                'Importance': 'high'
-            }
+            `
         };
 
         console.log('📧 Intentando enviar correo a:', to);
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Correo enviado:', info.messageId);
+        const emailSent = await sendEmail(mailOptions);
+        if (!emailSent) {
+            return false;
+        }
         
         // Limpiar cache después de 1 hora
         setTimeout(() => {
@@ -176,10 +227,6 @@ async function sendAdminLoginMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: {
-                name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
-            },
             to,
             subject: `Código de acceso administrador - ${code}`,
             text: `Tu código de acceso administrador es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
@@ -227,8 +274,10 @@ async function sendAdminLoginMail(to, code) {
 </html>`
         };
 
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Código administrador enviado:', info.messageId);
+        const emailSent = await sendEmail(mailOptions);
+        if (!emailSent) {
+            return false;
+        }
 
         setTimeout(() => {
             recentEmails.delete(to);
