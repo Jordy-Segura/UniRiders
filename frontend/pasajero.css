@@ -182,6 +182,14 @@ body {
     outline: none;
 }
 
+@media (max-width: 520px) {
+    .search-form input,
+    .search-form select,
+    .chat-input-group input {
+        font-size: 16px;
+    }
+}
+
 .driver-info-panel {
     background: rgba(0, 0, 0, 0.2);
     padding: 15px;
@@ -189,4 +197,49 @@ body {
     margin-top: 20px;
     text-align: left;
     color: #eee;
+}
+
+@media (max-width: 768px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        padding: 16px 0 32px;
+    }
+
+    .main-panel {
+        padding: 22px;
+        width: 94%;
+    }
+
+    #map {
+        height: 260px;
+    }
+
+    .chat-input-group {
+        flex-direction: column;
+    }
+
+    .chat-input-group input {
+        width: 100%;
+    }
+
+    .search-form input,
+    .search-form select,
+    .search-btn {
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-panel {
+        padding: 18px;
+    }
+
+    #map {
+        height: 220px;
+    }
+
+    .logout-btn {
+        width: 100%;
+    }
 }

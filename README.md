@@ -1,5 +1,7 @@
 # UniRiders
 
+La interfaz usa el logotipo como texto en la landing, por lo que ya no se requiere un archivo de imagen adicional.
+
 ## Base de datos UniRidersDB
 
 En la carpeta `database/` se incluye el script `UniRidersDB.sql` con toda la definición de la nueva base de datos **UniRidersDB**. El script crea las tablas `Usuarios`, `Tarifas`, `Viajes`, `Vehiculos`, `EstadisticasApp`, `HistorialChat` y `EmailVerifications`, junto con índices para los campos consultados con más frecuencia.

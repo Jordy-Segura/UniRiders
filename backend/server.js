@@ -17,6 +17,8 @@ const fs = require('fs');
 const { sendRecoveryMail, sendVerificationMail, sendAdminLoginMail } = require('./mailer');
 const https = require('https');
 
+const PORT = process.env.PORT || 3000;
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -383,6 +385,7 @@ function mapDbTripToOffer(row = {}) {
         origin: row.origen || fallbackTrip.origin || 'Origen no disponible',
         destination: row.destino || fallbackTrip.destination || 'Destino no disponible',
         payment: row.metodo_pago || fallbackTrip.payment || 'Efectivo',
+        fare: row.costo ?? fallbackTrip.fare ?? null,
         timestamp: row.fecha_solicitud ? formatTripTimestamp(row.fecha_solicitud) : (fallbackTrip.timestamp || formatTripTimestamp()),
         originCoords: fallbackTrip.originCoords || 'Lat: -1.65, Lon: -78.68',
         destinationCoords: fallbackTrip.destinationCoords || 'Lat: -1.66, Lon: -78.69',
@@ -1354,7 +1357,7 @@ app.get("/api/trips/offers", async (req, res) => {
     try {
         const pool = await poolPromise;
         const result = await pool.request().query(`
-            SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+            SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud, v.costo,
                    v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
             FROM Viajes v
             INNER JOIN Usuarios u ON v.pasajero_email = u.email
@@ -1372,7 +1375,7 @@ app.get("/api/trips/offers", async (req, res) => {
 
 // Ruta para crear viaje en base de datos
 app.post("/api/trips/request", async (req, res) => {
-    const { passengerName, origin, destination, paymentMethod, passengerEmail } = req.body;
+    const { passengerName, origin, destination, paymentMethod, passengerEmail, offeredFare } = req.body;
 
     if (!passengerName || !origin || !destination) {
         return res.status(400).json({ message: "Datos incompletos" });
@@ -1383,6 +1386,11 @@ app.post("/api/trips/request", async (req, res) => {
         return res.status(500).json({ message: "No existe una tarifa activa para registrar el viaje" });
     }
 
+    const parsedFare = offeredFare !== undefined && offeredFare !== null && offeredFare !== ''
+        ? Number(offeredFare)
+        : null;
+    const fareValue = Number.isFinite(parsedFare) && parsedFare > 0 ? parsedFare : null;
+
     const newTrip = {
         id: Date.now(),
         passenger: passengerName,
@@ -1390,6 +1398,7 @@ app.post("/api/trips/request", async (req, res) => {
         origin: origin,
         destination: destination,
         payment: paymentMethod || 'Efectivo',
+        fare: fareValue,
         timestamp: new Date().toLocaleTimeString(),
         originCoords: `Lat: -1.65, Lon: -78.68`,
         destinationCoords: `Lat: -1.66, Lon: -78.69`,
@@ -1407,6 +1416,7 @@ app.post("/api/trips/request", async (req, res) => {
             .input("origen", sql.NVarChar, origin)
             .input("destino", sql.NVarChar, destination)
             .input("metodo_pago", sql.NVarChar, paymentMethod || 'Efectivo')
+            .input("costo", sql.Decimal(10, 2), fareValue)
             .execute('sp_RegistrarViaje');
 
         if (result.recordset?.length) {
@@ -1449,7 +1459,7 @@ app.post("/api/trips/accept", async (req, res) => {
             const dbTripResult = await pool.request()
                 .input("tripId", sql.Int, numericTripId)
                 .query(`
-                    SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                    SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud, v.costo,
                            v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
                     FROM Viajes v
                     INNER JOIN Usuarios u ON v.pasajero_email = u.email
@@ -1858,7 +1868,7 @@ app.post("/api/chat/:tripId/send", (req, res) => {
     globalChatMessages[tripId].push(newMessage);
     
     // Guardar en base de datos también
-    fetch(`http://localhost:${API_PORT}/api/chat/${tripId}/save`, {
+    fetch(`http://localhost:${PORT}/api/chat/${tripId}/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sender, message: sanitizedMessage, type })
@@ -2530,7 +2540,6 @@ if (require.main === module) {
     // Actualizar estadísticas periódicamente
     setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
 
-    const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
         console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
     });

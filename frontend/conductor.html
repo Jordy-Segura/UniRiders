@@ -982,6 +982,7 @@
                 <p>De: <strong id="activeTripOrigin"></strong> (<span id="activeTripOriginCoords"></span>)</p>
                 <p>A: <strong id="activeTripDestination"></strong> (<span id="activeTripDestinationCoords"></span>)</p>
                 <p>Pago: <strong id="activeTripPayment"></strong></p>
+                <p>Tarifa propuesta: <strong id="activeTripFare">$--</strong></p>
                 <p>Tiempo estimado: <strong id="estimatedTime">15 min</strong></p>
             </div>
             
@@ -1694,7 +1695,8 @@
                         <h4>🏍️ Viaje ID: ${offer.id} <span style="font-weight: 400; font-size: 0.9em;">(${offer.timestamp})</span></h4>
                         <p>📍 De: <strong>${offer.origin}</strong></p>
                         <p>🏁 A: <strong>${offer.destination}</strong></p>
-                        <p>👤 Pasajero: ${offer.passenger} | 💰 Pago: <strong>${offer.payment}</strong></p>
+                        <p>👤 Pasajero: ${offer.passenger}</p>
+                        <p>💰 Tarifa propuesta: <strong>${offer.fare ? `$${Number(offer.fare).toFixed(2)}` : 'Sin tarifa'}</strong> · Pago: <strong>${offer.payment}</strong></p>
                         <button class="accept-btn" onclick="acceptTrip(${offer.id})">✅ Aceptar Viaje</button>
                     `;
                     offersList.appendChild(card);
@@ -1756,6 +1758,7 @@
                     document.getElementById('activeTripDestination').innerText = currentTrip.destination;
                     document.getElementById('activeTripDestinationCoords').innerText = `(${currentTrip.destinationCoords})`;
                     document.getElementById('activeTripPayment').innerText = currentTrip.payment;
+                    document.getElementById('activeTripFare').innerText = currentTrip.fare ? `$${Number(currentTrip.fare).toFixed(2)}` : '$--';
 
                     const originCoords = parseCoordsFromText(currentTrip.originCoords);
                     if (originCoords) {
@@ -2195,6 +2198,7 @@
                     origin: tripDetails.origen,
                     destination: tripDetails.destino,
                     payment: tripDetails.metodo_pago,
+                    fare: tripDetails.costo,
                     status: 'aceptado'
                 };
                 
@@ -2207,6 +2211,7 @@
                 document.getElementById('activeTripOrigin').innerText = currentTrip.origin;
                 document.getElementById('activeTripDestination').innerText = currentTrip.destination;
                 document.getElementById('activeTripPayment').innerText = currentTrip.payment;
+                document.getElementById('activeTripFare').innerText = currentTrip.fare ? `$${Number(currentTrip.fare).toFixed(2)}` : '$--';
 
                 // Configurar mapa y chat
                 if (tripDetails.coordenadas_pasajero_lat && tripDetails.coordenadas_pasajero_lon) {

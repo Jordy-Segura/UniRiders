@@ -6,124 +6,6 @@
     <title>UniRiders 🏍️ - Compartiendo Viajes en ESPOCH</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <style>
-        /* Partículas animadas en el fondo */
-        .particles {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            background: linear-gradient(135deg, #0072ff, #00c6ff);
-        }
-        
-        .particle {
-            position: absolute;
-            background: rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            animation: float 15s infinite linear;
-        }
-        
-        @keyframes float {
-            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
-            10% { opacity: 0.7; }
-            90% { opacity: 0.7; }
-            100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
-        }
-
-        /* Mejoras en la tarjeta de auth */
-        .auth-card {
-            position: relative;
-            overflow: hidden;
-        }
-
-        .auth-card::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
-            transform: rotate(45deg);
-            animation: shine 3s infinite;
-        }
-
-        @keyframes shine {
-            0% { transform: translateX(-100%) rotate(45deg); }
-            100% { transform: translateX(100%) rotate(45deg); }
-        }
-
-        /* Estadísticas en tiempo real */
-        .live-stats {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 15px;
-            backdrop-filter: blur(10px);
-            color: white;
-            font-size: 0.9em;
-        }
-
-        .stat-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 5px 0;
-        }
-
-        /* Mejoras en los inputs */
-        .input-container {
-            position: relative;
-        }
-
-        .input-focus-effect {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: linear-gradient(90deg, #0072ff, #00c6ff);
-            transition: width 0.3s ease;
-        }
-
-        .input-container:focus-within .input-focus-effect {
-            width: 100%;
-        }
-
-        /* Efectos de validación en tiempo real */
-        .password-strength {
-            height: 4px;
-            background: #eee;
-            border-radius: 2px;
-            margin-top: 5px;
-            overflow: hidden;
-        }
-
-        .strength-bar {
-            height: 100%;
-            width: 0%;
-            transition: all 0.3s ease;
-            border-radius: 2px;
-        }
-
-        .strength-weak { background: #ff4444; width: 33%; }
-        .strength-medium { background: #ffaa00; width: 66%; }
-        .strength-strong { background: #00c851; width: 100%; }
-
-        /* Recordatorio de seguridad */
-        .security-tips {
-            background: rgba(255,255,255,0.1);
-            padding: 10px;
-            border-radius: 10px;
-            margin-top: 15px;
-            font-size: 0.8em;
-            border-left: 3px solid #00c6ff;
-        }
-    </style>
 </head>
 <body>
     <!-- Botón de tema -->
@@ -133,8 +15,8 @@
     <div class="floating-illustration" aria-hidden="true">
         <i class="fas fa-motorcycle"></i>
     </div>
-    <span class="animated-ripple" style="width: 220px; height: 220px; right: 8%; bottom: 6%;"></span>
-    <span class="animated-ripple" style="width: 320px; height: 320px; right: 4%; bottom: 3%; animation-delay: 4s;"></span>
+    <span class="animated-ripple animated-ripple--primary"></span>
+    <span class="animated-ripple animated-ripple--secondary"></span>
 
     <!-- Partículas animadas -->
     <div class="particles" id="particlesContainer"></div>
@@ -161,7 +43,7 @@
 
     <div class="auth-container">
         <h1 class="logo">UniRiders 🏍️</h1>
-        <p style="color: white; margin-bottom: 20px; font-size: 0.9em;">
+        <p class="landing-subtitle">
             🏍️ Compartiendo viajes seguros en la ESPOCH
         </p>
         
@@ -187,8 +69,8 @@
                     <div class="input-focus-effect"></div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <label style="color: #666; font-size: 0.9em;">
+                <div class="auth-meta">
+                    <label>
                         <input type="checkbox" id="rememberMe"> Recordarme
                     </label>
                     <a href="#" id="forgotLink" class="forgot-link">¿Olvidaste tu contraseña?</a>
@@ -203,7 +85,7 @@
                     Verifica que estés en <strong>uniriders-espoch.com</strong>
                 </div>
 
-                <a href="#" id="adminAccessLink" class="forgot-link" style="display: block; text-align: center; margin-top: 15px;">
+                <a href="#" id="adminAccessLink" class="forgot-link admin-access-link">
                     🛡️ Acceso administrador con código
                 </a>
             </form>
@@ -256,11 +138,11 @@
                     </label>
                 </div>
 
-                <div style="margin: 15px 0;">
-                    <label style="color: #666; font-size: 0.8em;">
+                <div class="terms-wrapper">
+                    <label class="terms-label">
                         <input type="checkbox" id="acceptTerms" required>
-                        Acepto los <a href="#" style="color: #0072ff;">términos de servicio</a> y
-                        <a href="#" style="color: #0072ff;">política de privacidad</a>
+                        Acepto los <a href="#">términos de servicio</a> y
+                        <a href="#">política de privacidad</a>
                     </label>
                 </div>
 
@@ -281,7 +163,7 @@
                     <i class="fas fa-paper-plane"></i> Enviar código de recuperación
                 </button>
                 
-                <hr style="margin: 20px 0; border-color: #f0f0f0;">
+                <hr class="section-divider">
 
                 <div class="input-container">
                     <i class="fas fa-key icon"></i>
@@ -298,7 +180,7 @@
                     <i class="fas fa-check"></i> Restablecer contraseña
                 </button>
 
-                <a href="#" id="backToLogin" class="forgot-link" style="text-align: center; display: block; margin-top: 15px;">
+                <a href="#" id="backToLogin" class="forgot-link centered-link">
                     ← Volver al inicio de sesión
                 </a>
             </form>
@@ -316,7 +198,7 @@
                     <i class="fas fa-paper-plane"></i> Enviar código de acceso
                 </button>
 
-                <hr style="margin: 20px 0; border-color: #f0f0f0;">
+                <hr class="section-divider">
 
                 <div class="input-container">
                     <i class="fas fa-key icon"></i>
@@ -328,7 +210,7 @@
                     <i class="fas fa-unlock"></i> Verificar código
                 </button>
 
-                <a href="#" id="backToLoginFromAdmin" class="forgot-link" style="text-align: center; display: block; margin-top: 15px;">
+                <a href="#" id="backToLoginFromAdmin" class="forgot-link centered-link">
                     ← Volver al inicio
                 </a>
             </form>
