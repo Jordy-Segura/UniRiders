@@ -43,7 +43,27 @@ transporter.verify(function (error) {
     } else {
         console.log("✅ Servidor de correo listo");
     }
-});
+
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            }
+        });
+        console.log('✅ Correo enviado (SMTP):', info.messageId);
+        return true;
+    } catch (error) {
+        console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
 
 async function sendWithResend({ to, subject, text, html }) {
     if (!resend) {
@@ -149,17 +169,17 @@ async function sendRecoveryMail(to, code) {
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; }
-        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #e1e5e9; }
-        .header { background: linear-gradient(135deg, #0078d4, #00bcf2); padding: 25px 20px; text-align: center; color: white; }
-        .content { padding: 25px 20px; }
-        .code-box { background: #f3f2f1; padding: 20px; border-radius: 6px; border: 2px solid #0078d4; text-align: center; margin: 20px 0; }
-        .warning { background: #fff4ce; border: 1px solid #ffaa44; border-radius: 4px; padding: 15px; margin: 20px 0; }
-        .footer { background: #f3f2f1; padding: 15px; text-align: center; border-top: 1px solid #d2d0ce; color: #605e5c; }
-        .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-    </style>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; }
+    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #e1e5e9; }
+    .header { background: linear-gradient(135deg, #0078d4, #00bcf2); padding: 25px 20px; text-align: center; color: white; }
+    .content { padding: 25px 20px; }
+    .code-box { background: #f3f2f1; padding: 20px; border-radius: 6px; border: 2px solid #0078d4; text-align: center; margin: 20px 0; }
+    .warning { background: #fff4ce; border: 1px solid #ffaa44; border-radius: 4px; padding: 15px; margin: 20px 0; }
+    .footer { background: #f3f2f1; padding: 15px; text-align: center; border-top: 1px solid #d2d0ce; color: #605e5c; }
+    .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+  </style>
 </head>
 <body>
     <div class="container">
@@ -306,10 +326,30 @@ async function sendAdminLoginMail(to, code) {
         recentEmails.delete(to);
         return false;
     }
+    recentEmails.set(to, now);
+
+    const subject = `Código de acceso administrador - ${code}`;
+    const text =
+      `Tu código de acceso administrador es: ${code}\n\n` +
+      `Este código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`;
+
+    const html = `<p>Tu código de acceso administrador es: <b>${code}</b></p><p>Expira en 10 minutos.</p>`;
+
+    console.log("📧 (Resend) Enviando admin code a:", to);
+    const info = await sendEmail({ to, subject, text, html });
+    console.log("✅ Código administrador enviado (Resend):", info?.id || info);
+
+    setTimeout(() => recentEmails.delete(to), 60 * 60 * 1000);
+    return true;
+  } catch (error) {
+    console.log("❌ Error enviando código administrador (Resend):", error.message || error);
+    recentEmails.delete(to);
+    return false;
+  }
 }
 
 module.exports = {
-    sendRecoveryMail,
-    sendVerificationMail,
-    sendAdminLoginMail
+  sendRecoveryMail,
+  sendVerificationMail,
+  sendAdminLoginMail
 };
