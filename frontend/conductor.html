@@ -79,11 +79,34 @@
             box-shadow: 0 0 10px var(--color-verde-espoch), 0 0 20px var(--color-verde-espoch);
         }
         .offers-panel {
-            background: rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.28);
             padding: 20px;
             border-radius: 15px;
             margin-top: 20px;
             text-align: left;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .negotiation-panel {
+            background: rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .negotiation-panel h4 {
+            margin-bottom: 6px;
+        }
+        .negotiation-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .negotiation-tag {
+            background: rgba(255, 255, 255, 0.18);
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-weight: 600;
+            font-size: 0.85em;
         }
         .offers-list {
             max-height: 250px; 
@@ -91,13 +114,24 @@
             margin-top: 15px;
         }
         .offer-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.16);
             padding: 15px;
             border-radius: 10px;
             margin-bottom: 10px;
             transition: 0.3s;
             border-left: 5px solid var(--color-verde-espoch);
             position: relative;
+        }
+        .offer-price {
+            font-weight: 700;
+            color: #fefefe;
+            margin-bottom: 6px;
+        }
+        .offer-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
         }
         .accept-btn {
             background: var(--color-verde-espoch);
@@ -109,6 +143,31 @@
             font-weight: 600;
             margin-top: 10px;
             transition: 0.3s;
+        }
+        .counter-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .counter-input {
+            flex: 1;
+            min-width: 120px;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 10px;
+            font-size: 14px;
+        }
+        .map-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.85em;
         }
         .logout-btn {
             background: white;
@@ -129,6 +188,19 @@
             cursor: pointer;
             margin-left: 10px;
             transition: transform 0.3s;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                padding: 12px 0 30px;
+            }
+            .main-panel {
+                padding: 20px;
+                width: 94%;
+            }
+            .offers-list {
+                max-height: 220px;
+            }
         }
 
         /* Mapa de Google */
@@ -964,7 +1036,17 @@
         <p id="geoStatus">Estado: Fuera de línea</p>
 
         <div class="offers-panel" id="offersPanel">
-            <h3>🏍️ Ofertas de Viaje Recientes</h3>
+            <h3>🏍️ Feed de ofertas (modelo inDrive)</h3>
+            <div class="negotiation-panel">
+                <h4>📍 Ves destino + precio antes de aceptar</h4>
+                <p>Negocia con contraofertas rápidas si el viaje requiere más distancia o tiempo.</p>
+                <div class="negotiation-tags">
+                    <span class="negotiation-tag">Aceptar</span>
+                    <span class="negotiation-tag">+ $1</span>
+                    <span class="negotiation-tag">+ $2</span>
+                    <span class="negotiation-tag">Ignorar sin penalización</span>
+                </div>
+            </div>
             <div class="offers-list" id="offersList">
                 <div class="no-offers">Activa tu servicio para ver viajes.</div>
             </div>
@@ -1689,13 +1771,27 @@
                     const card = document.createElement('div');
                     card.classList.add('offer-card');
                     card.setAttribute('data-trip-id', offer.id);
+                    const baseOffer = Number(offer.offerPrice || 0);
+                    const offerLabel = baseOffer > 0 ? `$${baseOffer.toFixed(2)}` : 'Sin oferta';
+
+                    const mapsLink = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(offer.origin)}&destination=${encodeURIComponent(offer.destination)}`;
 
                     card.innerHTML = `
                         <h4>🏍️ Viaje ID: ${offer.id} <span style="font-weight: 400; font-size: 0.9em;">(${offer.timestamp})</span></h4>
+                        <div class="offer-price">💵 Oferta del pasajero: ${offerLabel}</div>
                         <p>📍 De: <strong>${offer.origin}</strong></p>
                         <p>🏁 A: <strong>${offer.destination}</strong></p>
                         <p>👤 Pasajero: ${offer.passenger} | 💰 Pago: <strong>${offer.payment}</strong></p>
-                        <button class="accept-btn" onclick="acceptTrip(${offer.id})">✅ Aceptar Viaje</button>
+                        <a class="map-link" href="${mapsLink}" target="_blank" rel="noopener">
+                            <i class="fas fa-map-location-dot"></i> Ver ruta en Google Maps
+                        </a>
+                        <div class="offer-actions">
+                            <button class="accept-btn" onclick="acceptTrip(${offer.id})">✅ Aceptar Viaje</button>
+                            <button class="counter-btn" onclick="sendCounterOffer(${offer.id}, ${(baseOffer + 1).toFixed(2)})">+ $1</button>
+                            <button class="counter-btn" onclick="sendCounterOffer(${offer.id}, ${(baseOffer + 2).toFixed(2)})">+ $2</button>
+                            <input class="counter-input" type="number" min="1" step="0.5" placeholder="Otra oferta" data-counter-input="${offer.id}">
+                            <button class="counter-btn" onclick="sendCounterOfferFromInput(${offer.id})">Enviar</button>
+                        </div>
                     `;
                     offersList.appendChild(card);
                     gsap.from(card, { opacity: 0, y: 20, duration: 0.5, ease: "back.out(1.2)" });
@@ -1778,7 +1874,51 @@
                 alert('Error de conexión al aceptar el viaje. Revisa la consola para más detalles.');
             }
         }
-        window.acceptTrip = acceptTrip; 
+
+        async function sendCounterOffer(tripId, amount) {
+            try {
+                const res = await fetch(`${API}/trips/counteroffer`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-email': userEmail,
+                        'session-id': sessionId
+                    },
+                    body: JSON.stringify({
+                        tripId: parseInt(tripId),
+                        driverName: driverName,
+                        driverEmail: userEmail,
+                        counterOffer: parseFloat(amount)
+                    })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('🤝 Contraoferta enviada al pasajero.', true);
+                } else {
+                    showToast(data.message || 'No se pudo enviar la contraoferta.', false);
+                }
+            } catch (error) {
+                console.error('Error al enviar contraoferta:', error);
+                showToast('No se pudo enviar la contraoferta.', false);
+            }
+        }
+
+        function sendCounterOfferFromInput(tripId) {
+            const input = document.querySelector(`[data-counter-input="${tripId}"]`);
+            if (!input) return;
+            const value = parseFloat(input.value);
+            if (Number.isNaN(value) || value <= 0) {
+                showToast('Ingresa una contraoferta válida.', false);
+                return;
+            }
+            sendCounterOffer(tripId, value);
+            input.value = '';
+        }
+
+        window.acceptTrip = acceptTrip;
+        window.sendCounterOffer = sendCounterOffer;
+        window.sendCounterOfferFromInput = sendCounterOfferFromInput;
         
         // Función para finalizar viaje (reemplaza la existente)
         async function completeTrip() {
