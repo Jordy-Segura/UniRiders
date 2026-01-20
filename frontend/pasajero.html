@@ -2049,6 +2049,10 @@
                 messageArea.innerText = "🚨 Ingresa una oferta válida para negociar.";
                 return;
             }
+            if (Number.isNaN(offerPrice) || offerPrice <= 0) {
+                messageArea.innerText = "🚨 Ingresa una oferta válida para negociar.";
+                return;
+            }
 
             requestRideBtn.disabled = true;
             requestRideBtn.innerText = 'Enviando oferta...';
