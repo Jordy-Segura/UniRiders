@@ -5,73 +5,43 @@ const FALLBACK_FROM = "UniRiders <onboarding@resend.dev>";
 const FROM = process.env.RESEND_FROM || FALLBACK_FROM;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
 console.log("RESEND_FROM =", process.env.RESEND_FROM);
 
 function normalizeEmailValue(value) {
-  return value ? String(value).trim().toLowerCase() : "";
+    return value ? String(value).trim().toLowerCase() : "";
 }
 
 function isAllowedRecipient(email) {
-  const normalized = normalizeEmailValue(email);
-  return normalized.endsWith("@espoch.edu.ec");
+    const normalized = normalizeEmailValue(email);
+    return normalized.endsWith("@espoch.edu.ec");
 }
 
 const RATE_LIMIT_MS = 30000;
 const recentEmails = new Map();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const transporter = nodemailer.createTransport({
+    host: "smtp.office365.com",
+    port: 587,
+    secure: false,
+    auth: {
+        user: "jordy.segura@espoch.edu.ec",
+        pass: "qgnxqkqdhykvkrzm"
+    },
+    tls: {
+        ciphers: "SSLv3",
+        rejectUnauthorized: false
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000
+});
 
-// En producción debe ser un remitente de TU dominio verificado, ejemplo:
-// RESEND_FROM="UniRiders <no-reply@uniriders.app>"
-const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
-
-async function sendEmail({ to, subject, text, html }) {
-  const { data, error } = await resend.emails.send({
-    from: FROM,
-    to,
-    subject,
-    text,
-    html
-  });
-
-  if (error) {
-    throw new Error(typeof error === "string" ? error : JSON.stringify(error));
-  }
-
-  return data;
-}
-
-async function sendEmail({ to, subject, text, html }) {
-    if (RESEND_API_KEY) {
-        try {
-            const response = await fetch("https://api.resend.com/emails", {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${RESEND_API_KEY}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    from: FROM,
-                    to,
-                    subject,
-                    text,
-                    html
-                })
-            });
-
-            const payload = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                console.log("❌ Error enviando correo (Resend):", payload);
-                return false;
-            }
-
-            console.log("✅ Correo enviado (Resend):", payload.id || "OK");
-            return true;
-        } catch (error) {
-            console.log("❌ Error enviando correo (Resend):", error);
-            return false;
-        }
+transporter.verify(function (error) {
+    if (error) {
+        console.log("❌ Error configuración email:", error);
+    } else {
+        console.log("✅ Servidor de correo listo");
     }
 
     try {
@@ -91,6 +61,70 @@ async function sendEmail({ to, subject, text, html }) {
         return true;
     } catch (error) {
         console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
+
+async function sendWithResend({ to, subject, text, html }) {
+    if (!resend) {
+        return null;
+    }
+
+    const primary = await resend.emails.send({
+        from: FROM,
+        to,
+        subject,
+        text,
+        html
+    });
+
+    if (!primary.error) {
+        console.log("✅ Correo enviado (Resend):", primary.data?.id || "OK");
+        return true;
+    }
+
+    console.log("❌ Error enviando correo (Resend):", primary.error);
+    const errorMessage = typeof primary.error === "string" ? primary.error : JSON.stringify(primary.error);
+
+    if (errorMessage.includes("domain is not verified")) {
+        const fallback = await resend.emails.send({
+            from: FALLBACK_FROM,
+            to,
+            subject,
+            text,
+            html
+        });
+
+        if (!fallback.error) {
+            console.log("✅ Correo enviado (Resend fallback):", fallback.data?.id || "OK");
+            return true;
+        }
+
+        console.log("❌ Error enviando correo (Resend fallback):", fallback.error);
+        return false;
+    }
+
+    return false;
+}
+
+async function sendWithSmtp({ to, subject, text, html }) {
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                "X-Priority": "1",
+                "X-MSMail-Priority": "High",
+                "Importance": "high"
+            }
+        });
+        console.log("✅ Correo enviado (SMTP):", info.messageId);
+        return true;
+    } catch (error) {
+        console.log("❌ Error enviando correo (SMTP):", error);
         return false;
     }
 }
@@ -98,85 +132,37 @@ async function sendEmail({ to, subject, text, html }) {
 async function sendEmail({ to, subject, text, html }) {
     if (resend) {
         try {
-            const { data, error } = await resend.emails.send({
-                from: FROM,
-                to,
-                subject,
-                text,
-                html
-            });
-
-            if (!error) {
-                console.log("✅ Correo enviado (Resend):", data?.id || "OK");
-                return true;
+            const sent = await sendWithResend({ to, subject, text, html });
+            if (sent !== null) {
+                return sent;
             }
-
-            console.log("❌ Error enviando correo (Resend):", error);
-            const errorMessage = typeof error === "string" ? error : JSON.stringify(error);
-            if (errorMessage.includes("domain is not verified")) {
-                const fallbackResult = await resend.emails.send({
-                    from: FALLBACK_FROM,
-                    to,
-                    subject,
-                    text,
-                    html
-                });
-                if (!fallbackResult.error) {
-                    console.log("✅ Correo enviado (Resend fallback):", fallbackResult.data?.id || "OK");
-                    return true;
-                }
-                console.log("❌ Error enviando correo (Resend fallback):", fallbackResult.error);
-            }
-
-            return false;
         } catch (error) {
             console.log("❌ Error enviando correo (Resend):", error);
-            return false;
         }
     }
 
-    try {
-        const info = await transporter.sendMail({
-            from: FROM,
-            to,
-            subject,
-            text,
-            html,
-            headers: {
-                'X-Priority': '1',
-                'X-MSMail-Priority': 'High',
-                'Importance': 'high'
-            }
-        });
-        console.log('✅ Correo enviado (SMTP):', info.messageId);
-        return true;
-    } catch (error) {
-        console.log('❌ Error enviando correo (SMTP):', error);
-        return false;
-    }
+    return sendWithSmtp({ to, subject, text, html });
 }
 
 async function sendRecoveryMail(to, code) {
     try {
-        // Verificar que sea correo ESPOCH
         if (!isAllowedRecipient(to)) {
-            console.log('❌ Correo no autorizado para notificaciones:', to);
+            console.log("❌ Correo no autorizado para notificaciones:", to);
             return false;
         }
 
-        // Verificar rate limiting
         const now = Date.now();
         const lastSent = recentEmails.get(to);
-        
-        if (lastSent && (now - lastSent) < RATE_LIMIT_MS) {
-            console.log('⏰ Rate limit alcanzado para:', to);
+
+        if (lastSent && now - lastSent < RATE_LIMIT_MS) {
+            console.log("⏰ Rate limit alcanzado para:", to);
             return false;
         }
-        
+
         recentEmails.set(to, now);
 
         const mailOptions = {
-            to: to,
+            to,
             subject: `Código de Verificación UniRiders - ${code}`,
             text: `Tu código de verificación para UniRiders es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
             html: `
@@ -196,68 +182,82 @@ async function sendRecoveryMail(to, code) {
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <div class="logo">🚗 UniRiders</div>
-      <p style="margin: 5px 0 0 0; opacity: 0.9;">Plataforma de Movilidad Estudiantil - ESPOCH</p>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🚗 UniRiders</div>
+            <p style="margin: 5px 0 0 0; opacity: 0.9;">Plataforma de Movilidad Estudiantil - ESPOCH</p>
+        </div>
+        <div class="content">
+            <h2 style="color: #323130; text-align: center; margin-bottom: 15px;">Verificación de Cuenta</h2>
+            <p style="color: #605e5c; text-align: center; font-size: 16px; line-height: 1.5;">
+                Hola integrante de UniRiders,<br>
+                Para completar tu registro en la plataforma, utiliza el siguiente código:
+            </p>
+            <div class="code-box">
+                <div style="font-size: 14px; color: #605e5c; margin-bottom: 8px;">CÓDIGO DE VERIFICACIÓN</div>
+                <h1 style="margin: 0; color: #0078d4; font-size: 32px; letter-spacing: 6px; font-weight: 600; font-family: 'Consolas', monospace;">${code}</h1>
+            </div>
+            <div class="warning">
+                <p style="margin: 0; color: #8a5500; font-size: 14px; line-height: 1.4;">
+                    <strong>📋 Información importante:</strong><br>
+                    • Este código expira en 10 minutos<br>
+                    • Es de un solo uso<br>
+                    • Si no reconoces esta solicitud, ignora este mensaje
+                </p>
+            </div>
+            <p style="color: #8a8886; text-align: center; font-size: 12px; margin-top: 25px; line-height: 1.4;">
+                Este es un mensaje automático del sistema UniRiders - ESPOCH<br>
+                Por favor no respondas a este correo.
+            </p>
+        </div>
+        <div class="footer">
+            <p style="margin: 0; font-size: 11px;">
+                © 2024 UniRiders - Escuela Superior Politécnica de Chimborazo<br>
+                Sistema de transporte seguro para la comunidad estudiantil
+            </p>
+        </div>
     </div>
 </body>
 </html>
             `
         };
 
-        console.log('📧 Intentando enviar correo a:', to);
+        console.log("📧 Intentando enviar correo a:", to);
         const emailSent = await sendEmail(mailOptions);
         if (!emailSent) {
             return false;
         }
-        
-        // Limpiar cache después de 1 hora
+
         setTimeout(() => {
             recentEmails.delete(to);
         }, 60 * 60 * 1000);
 
-    <div class="footer">
-      <p style="margin: 0; font-size: 11px;">
-        © 2024 UniRiders - Escuela Superior Politécnica de Chimborazo<br>
-        Sistema de transporte seguro para la comunidad estudiantil
-      </p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-    console.log("📧 (Resend) Enviando correo a:", to);
-    const info = await sendEmail({ to, subject, text, html });
-    console.log("✅ Correo enviado (Resend):", info?.id || info);
-
-    setTimeout(() => recentEmails.delete(to), 60 * 60 * 1000);
-    return true;
-  } catch (error) {
-    console.log("❌ Error enviando correo (Resend):", error.message || error);
-    recentEmails.delete(to);
-    return false;
-  }
+        return true;
+    } catch (error) {
+        console.log("❌ Error enviando correo:", error);
+        recentEmails.delete(to);
+        return false;
+    }
 }
 
 async function sendVerificationMail(to, code) {
-  return await sendRecoveryMail(to, code);
+    return sendRecoveryMail(to, code);
 }
 
 async function sendAdminLoginMail(to, code) {
     try {
         const normalized = normalizeEmailValue(to);
 
-        if (!normalized.endsWith('@gmail.com')) {
-            console.log('❌ Correo de administrador no válido (debe ser Gmail):', to);
+        if (!normalized.endsWith("@gmail.com")) {
+            console.log("❌ Correo de administrador no válido (debe ser Gmail):", to);
             return false;
         }
 
         const now = Date.now();
         const lastSent = recentEmails.get(to);
 
-        if (lastSent && (now - lastSent) < RATE_LIMIT_MS) {
-            console.log('⏰ Rate limit alcanzado para acceso administrador:', to);
+        if (lastSent && now - lastSent < RATE_LIMIT_MS) {
+            console.log("⏰ Rate limit alcanzado para acceso administrador:", to);
             return false;
         }
 
@@ -320,11 +320,11 @@ async function sendAdminLoginMail(to, code) {
             recentEmails.delete(to);
         }, 60 * 60 * 1000);
 
-    const now = Date.now();
-    const lastSent = recentEmails.get(to);
-    if (lastSent && now - lastSent < RATE_LIMIT_MS) {
-      console.log("⏰ Rate limit alcanzado para acceso administrador:", to);
-      return false;
+        return true;
+    } catch (error) {
+        console.log("❌ Error enviando código administrador:", error);
+        recentEmails.delete(to);
+        return false;
     }
     recentEmails.set(to, now);
 
