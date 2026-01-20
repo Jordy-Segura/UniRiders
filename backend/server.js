@@ -3,6 +3,7 @@ require('dotenv').config();
 console.log("DB_SERVER:", process.env.DB_SERVER);
 
 const connectedUsers = new Map();
+const activeSessions = new Map();
 const typingUsers = new Map();
 const verificationCodes = new Map();
 
@@ -64,6 +65,83 @@ function sanitizePhoneNumber(phone) {
     const digits = String(phone).replace(/\D/g, "");
     return digits.length ? digits : null;
 }
+
+function parseDeviceInfo(userAgent = '') {
+    const ua = userAgent.toLowerCase();
+    if (ua.includes('iphone') || ua.includes('ipad')) return 'iOS (Safari)';
+    if (ua.includes('android')) return 'Android';
+    if (ua.includes('windows')) return 'Windows';
+    if (ua.includes('mac os') || ua.includes('macintosh')) return 'macOS';
+    if (ua.includes('linux')) return 'Linux';
+    return 'Dispositivo desconocido';
+}
+
+function buildSessionSnapshot(session) {
+    if (!session) return null;
+    return {
+        device: session.device,
+        ip: session.ip,
+        lastActive: session.lastActive
+    };
+}
+
+function registerSession(email, req) {
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    const userAgent = req?.headers?.['user-agent'] || '';
+    activeSessions.set(normalizeEmail(email), {
+        sessionId,
+        lastActive: Date.now(),
+        userAgent,
+        device: parseDeviceInfo(userAgent),
+        ip: req?.ip || req?.headers?.['x-forwarded-for'] || 'desconocida'
+    });
+    return sessionId;
+}
+
+function isOpenSessionRoute(req) {
+    const openRoutes = new Set([
+        '/api/login',
+        '/api/register',
+        '/api/verify-registration',
+        '/api/resend-verification',
+        '/api/recover',
+        '/api/reset',
+        '/api/admin/request-code',
+        '/api/admin/verify-code'
+    ]);
+
+    if (!req.path.startsWith('/api')) return true;
+    if (openRoutes.has(req.path)) return true;
+    if (req.method === 'GET' && (
+        req.path === '/api/system/time' ||
+        req.path === '/api/stats/overview' ||
+        req.path === '/api/drivers/active' ||
+        (req.path.startsWith('/api/profile/') && req.path.endsWith('/photo'))
+    )) return true;
+
+    return false;
+}
+
+app.use((req, res, next) => {
+    if (isOpenSessionRoute(req)) return next();
+    const email = normalizeEmail(req.headers['user-email']);
+    const sessionId = req.headers['session-id'];
+
+    if (!email || !sessionId) {
+        return res.status(401).json({ message: "Sesión requerida" });
+    }
+
+    const session = activeSessions.get(email);
+    if (!session || session.sessionId !== sessionId) {
+        return res.status(401).json({
+            message: "Sesión activa en otro dispositivo",
+            activeSession: buildSessionSnapshot(session)
+        });
+    }
+
+    session.lastActive = Date.now();
+    return next();
+});
 
 function isDriverBusy(email) {
     const normalizedEmail = normalizeEmail(email);
@@ -384,10 +462,12 @@ function mapDbTripToOffer(row = {}) {
         destination: row.destino || fallbackTrip.destination || 'Destino no disponible',
         payment: row.metodo_pago || fallbackTrip.payment || 'Efectivo',
         timestamp: row.fecha_solicitud ? formatTripTimestamp(row.fecha_solicitud) : (fallbackTrip.timestamp || formatTripTimestamp()),
-        originCoords: fallbackTrip.originCoords || 'Lat: -1.65, Lon: -78.68',
-        destinationCoords: fallbackTrip.destinationCoords || 'Lat: -1.66, Lon: -78.69',
+        originCoords: fallbackTrip.originCoords || null,
+        destinationCoords: fallbackTrip.destinationCoords || null,
         status: row.estado || fallbackTrip.status || 'pendiente',
-        tariffId: row.id_tarifa || fallbackTrip.tariffId || null
+        tariffId: row.id_tarifa || fallbackTrip.tariffId || null,
+        offerPrice: fallbackTrip.offerPrice ?? null,
+        counterOffer: fallbackTrip.counterOffer ?? null
     };
 }
 
@@ -575,14 +655,25 @@ app.post("/api/login", async (req, res) => {
             return res.status(401).json({ message: "Credenciales incorrectas" });
         }
 
+        const existingSession = activeSessions.get(normalizeEmail(user.email));
+        if (existingSession) {
+            return res.status(409).json({
+                message: "Ya existe una sesión activa. Cierra sesión en el otro dispositivo.",
+                activeSession: buildSessionSnapshot(existingSession)
+            });
+        }
+
         // Actualizar usuario activo
         appStatistics.activeUsers++;
+
+        const sessionId = registerSession(user.email, req);
 
         res.json({ 
             message: "Login exitoso", 
             userEmail: user.email,
             userName: user.nombre,
-            role: user.rol
+            role: user.rol,
+            sessionId
         });
 
     } catch (err) {
@@ -596,6 +687,12 @@ app.post("/api/admin/request-code", async (req, res) => {
 
     if (!normalizedEmail || !isGmailEmail(normalizedEmail)) {
         return res.status(400).json({ message: "Solo se permiten correos Gmail para administradores" });
+    }
+
+    if (!process.env.RESEND_API_KEY) {
+        return res.status(500).json({
+            message: "No se pudo enviar el código. Configura RESEND_API_KEY y RESEND_FROM en el servidor."
+        });
     }
 
     try {
@@ -667,11 +764,21 @@ app.post("/api/admin/verify-code", async (req, res) => {
         const adminRecord = adminLookup.recordset[0];
         verificationCodes.delete(normalizedEmail);
 
+        const existingSession = activeSessions.get(normalizeEmail(adminRecord.email));
+        if (existingSession) {
+            return res.status(409).json({
+                message: "Ya existe una sesión activa. Cierra sesión en el otro dispositivo.",
+                activeSession: buildSessionSnapshot(existingSession)
+            });
+        }
+
+        const sessionId = registerSession(adminRecord.email, req);
         res.json({
             message: "Acceso concedido",
             userEmail: adminRecord.email,
             userName: adminRecord.nombre || 'Administrador',
-            role: 'administrador'
+            role: 'administrador',
+            sessionId
         });
     } catch (err) {
         res.status(500).json({ message: "Error del servidor" });
@@ -925,14 +1032,42 @@ app.delete("/api/admin/users/:email", requireAdmin, async (req, res) => {
 
     try {
         const pool = await poolPromise;
-        const result = await pool.request()
-            .input("email", sql.NVarChar, normalizedTargetEmail)
-            .query("DELETE FROM Usuarios WHERE LOWER(email) = @email");
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("email", sql.NVarChar, normalizedTargetEmail);
+
+        await request.query(`
+            DELETE FROM HistorialChat
+            WHERE id_viaje IN (
+                SELECT id_viaje FROM Viajes
+                WHERE pasajero_email = @email OR conductor_email = @email
+            )
+        `);
+        await request.query(`
+            DELETE FROM Viajes
+            WHERE pasajero_email = @email OR conductor_email = @email
+        `);
+        await request.query(`
+            DELETE FROM Vehiculos
+            WHERE email_conductor = @email
+        `);
+        await request.query(`
+            DELETE FROM EmailVerifications
+            WHERE LOWER(email) = @email
+        `);
+        const result = await request.query(`
+            DELETE FROM Usuarios WHERE LOWER(email) = @email
+        `);
 
         if (result.rowsAffected[0] === 0) {
+            await transaction.rollback();
             return res.status(404).json({ message: "Usuario no encontrado" });
         }
 
+        await transaction.commit();
+        activeSessions.delete(normalizedTargetEmail);
         res.json({ message: "Usuario eliminado" });
     } catch (err) {
         res.status(500).json({ message: "Error al eliminar usuario" });
@@ -1289,6 +1424,99 @@ app.get("/api/trips/history", async (req, res) => {
     }
 });
 
+app.delete("/api/trips/history/clear", async (req, res) => {
+    const userEmail = req.headers['user-email'];
+    const userRole = req.headers['user-role'];
+
+    if (!userEmail || !userRole) {
+        return res.status(400).json({ message: "Datos de usuario requeridos" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("email", sql.NVarChar, normalizeEmail(userEmail));
+
+        await request.query(`
+            DELETE FROM HistorialChat
+            WHERE id_viaje IN (
+                SELECT id_viaje FROM Viajes
+                WHERE (pasajero_email = @email OR conductor_email = @email)
+                AND estado IN ('finalizado', 'cancelado')
+            )
+        `);
+        const result = await request.query(`
+            DELETE FROM Viajes
+            WHERE (pasajero_email = @email OR conductor_email = @email)
+            AND estado IN ('finalizado', 'cancelado')
+        `);
+
+        await transaction.commit();
+        const removed = result.rowsAffected[0] || 0;
+        res.json({ message: `Historial eliminado (${removed} viajes)` });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar historial" });
+    }
+});
+
+app.delete("/api/trips/:id", async (req, res) => {
+    const tripId = parseInt(req.params.id, 10);
+    const userEmail = req.headers['user-email'];
+    const userRole = req.headers['user-role'];
+
+    if (!userEmail || !userRole) {
+        return res.status(400).json({ message: "Datos de usuario requeridos" });
+    }
+    if (Number.isNaN(tripId)) {
+        return res.status(400).json({ message: "Viaje inválido" });
+    }
+
+    try {
+        const pool = await poolPromise;
+        const tripLookup = await pool.request()
+            .input("tripId", sql.Int, tripId)
+            .query(`
+                SELECT pasajero_email, conductor_email, estado
+                FROM Viajes
+                WHERE id_viaje = @tripId
+            `);
+
+        if (tripLookup.recordset.length === 0) {
+            return res.status(404).json({ message: "Viaje no encontrado" });
+        }
+
+        const trip = tripLookup.recordset[0];
+        const normalizedEmail = normalizeEmail(userEmail);
+        const ownerMatch = normalizeEmail(trip.pasajero_email) === normalizedEmail
+            || normalizeEmail(trip.conductor_email) === normalizedEmail;
+
+        if (!ownerMatch) {
+            return res.status(403).json({ message: "No autorizado para eliminar este viaje" });
+        }
+
+        if (!['finalizado', 'cancelado'].includes(String(trip.estado || '').toLowerCase())) {
+            return res.status(400).json({ message: "Solo se pueden eliminar viajes finalizados o cancelados" });
+        }
+
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
+
+        const request = new sql.Request(transaction);
+        request.input("tripId", sql.Int, tripId);
+
+        await request.query("DELETE FROM HistorialChat WHERE id_viaje = @tripId");
+        await request.query("DELETE FROM Viajes WHERE id_viaje = @tripId");
+
+        await transaction.commit();
+        res.json({ message: "Viaje eliminado del historial" });
+    } catch (err) {
+        res.status(500).json({ message: "Error al eliminar viaje" });
+    }
+});
+
 // Ruta para obtener historial de chat de un viaje
 app.get("/api/chat/:tripId/history", async (req, res) => {
     const tripId = req.params.tripId;
@@ -1372,7 +1600,7 @@ app.get("/api/trips/offers", async (req, res) => {
 
 // Ruta para crear viaje en base de datos
 app.post("/api/trips/request", async (req, res) => {
-    const { passengerName, origin, destination, paymentMethod, passengerEmail } = req.body;
+    const { passengerName, origin, destination, paymentMethod, passengerEmail, offerPrice, originCoords, destinationCoords } = req.body;
 
     if (!passengerName || !origin || !destination) {
         return res.status(400).json({ message: "Datos incompletos" });
@@ -1391,10 +1619,12 @@ app.post("/api/trips/request", async (req, res) => {
         destination: destination,
         payment: paymentMethod || 'Efectivo',
         timestamp: new Date().toLocaleTimeString(),
-        originCoords: `Lat: -1.65, Lon: -78.68`,
-        destinationCoords: `Lat: -1.66, Lon: -78.69`,
+        originCoords: originCoords || `Lat: -1.65, Lon: -78.68`,
+        destinationCoords: destinationCoords || `Lat: -1.66, Lon: -78.69`,
         status: 'pendiente',
-        tariffId: tarifaId
+        tariffId: tarifaId,
+        offerPrice: typeof offerPrice === 'number' ? offerPrice : null,
+        counterOffer: null
     };
 
     // Guardar en base de datos
@@ -1521,19 +1751,172 @@ app.post("/api/trips/accept", async (req, res) => {
     }
 });
 
+app.post("/api/trips/counteroffer", async (req, res) => {
+    const { tripId, driverName, driverEmail, counterOffer } = req.body;
+    const numericTripId = parseInt(tripId);
+    const counterValue = parseFloat(counterOffer);
+
+    if (Number.isNaN(numericTripId) || Number.isNaN(counterValue) || counterValue <= 0) {
+        return res.status(400).json({ message: "Datos de contraoferta inválidos" });
+    }
+
+    let trip = globalTripOffers.find(t => t.id === numericTripId);
+
+    if (!trip) {
+        try {
+            const pool = await poolPromise;
+            const dbTripResult = await pool.request()
+                .input("tripId", sql.Int, numericTripId)
+                .query(`
+                    SELECT v.id_viaje, v.origen, v.destino, v.metodo_pago, v.fecha_solicitud,
+                           v.id_tarifa, v.estado, v.pasajero_email, u.nombre AS pasajero
+                    FROM Viajes v
+                    INNER JOIN Usuarios u ON v.pasajero_email = u.email
+                    WHERE v.id_viaje = @tripId AND v.estado = 'pendiente'
+                `);
+
+            if (!dbTripResult.recordset.length) {
+                return res.status(404).json({ message: "Viaje no encontrado" });
+            }
+
+            trip = mapDbTripToOffer(dbTripResult.recordset[0]);
+            globalTripOffers.push(trip);
+        } catch (dbErr) {
+            return res.status(500).json({ message: "No se pudo cargar el viaje para contraoferta" });
+        }
+    }
+
+    trip.counterOffer = {
+        amount: counterValue,
+        driverName: driverName,
+        driverEmail: driverEmail,
+        timestamp: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+    };
+    trip.status = 'contraoferta';
+
+    return res.json({ message: "Contraoferta enviada", trip });
+});
+
+app.post("/api/trips/reoffer", (req, res) => {
+    const { tripId, passengerEmail, newOffer } = req.body;
+    const numericTripId = parseInt(tripId);
+    const offerValue = parseFloat(newOffer);
+
+    if (Number.isNaN(numericTripId) || Number.isNaN(offerValue) || offerValue <= 0) {
+        return res.status(400).json({ message: "Nueva oferta inválida" });
+    }
+
+    const trip = globalTripOffers.find(t => t.id === numericTripId);
+    if (!trip) {
+        return res.status(404).json({ message: "Viaje no encontrado" });
+    }
+
+    if (trip.passengerEmail && passengerEmail && normalizeEmail(trip.passengerEmail) !== normalizeEmail(passengerEmail)) {
+        return res.status(403).json({ message: "No tienes permisos para modificar esta oferta" });
+    }
+
+    trip.offerPrice = offerValue;
+    trip.counterOffer = null;
+    trip.status = 'pendiente';
+
+    return res.json({ message: "Oferta actualizada", trip });
+});
+
+app.post("/api/trips/accept-counteroffer", async (req, res) => {
+    const { tripId, passengerEmail } = req.body;
+    const numericTripId = parseInt(tripId);
+
+    if (Number.isNaN(numericTripId)) {
+        return res.status(400).json({ message: "Identificador de viaje inválido" });
+    }
+
+    const tripIndex = globalTripOffers.findIndex(t => t.id === numericTripId);
+    if (tripIndex === -1) {
+        return res.status(404).json({ message: "Viaje no encontrado" });
+    }
+
+    const trip = globalTripOffers[tripIndex];
+    if (!trip.counterOffer) {
+        return res.status(400).json({ message: "No hay contraoferta activa" });
+    }
+
+    if (trip.passengerEmail && passengerEmail && normalizeEmail(trip.passengerEmail) !== normalizeEmail(passengerEmail)) {
+        return res.status(403).json({ message: "No tienes permisos para aceptar esta oferta" });
+    }
+
+    const driverName = trip.counterOffer.driverName;
+    const driverEmail = trip.counterOffer.driverEmail;
+
+    globalTripOffers.splice(tripIndex, 1);
+
+    globalActiveTrips[numericTripId] = {
+        ...trip,
+        driver: driverName,
+        driverEmail: driverEmail,
+        status: 'aceptado',
+        startTime: new Date(),
+        driverLocation: { lat: -1.65, lon: -78.68 },
+        passengerLocation: parseCoordinateString(trip.originCoords) || null,
+        offerPrice: trip.counterOffer.amount
+    };
+
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input("tripId", sql.Int, numericTripId)
+            .input("driverEmail", sql.NVarChar, driverEmail)
+            .query(`
+                UPDATE Viajes SET conductor_email = @driverEmail
+                WHERE id_viaje = @tripId
+            `);
+
+        await pool.request()
+            .input("id_viaje", sql.Int, numericTripId)
+            .execute('sp_AceptarViaje');
+    } catch (dbErr) {
+        console.log('Error actualizando viaje en BD (contraoferta):', dbErr);
+    }
+
+    if (!globalChatMessages[numericTripId]) {
+        globalChatMessages[numericTripId] = [];
+    }
+
+    globalChatMessages[numericTripId].push({
+        sender: "Sistema UniRiders",
+        message: `🤝 Aceptaste la contraoferta de ${driverName}. El conductor va en camino.`,
+        time: new Date().toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' }),
+        type: "system"
+    });
+
+    return res.json({ message: "Contraoferta aceptada", trip: globalActiveTrips[numericTripId] });
+});
+
 app.get("/api/trips/:id/status", (req, res) => {
     const tripId = parseInt(req.params.id);
     
     if (globalActiveTrips[tripId]) {
         return res.json({ 
             status: globalActiveTrips[tripId].status,
-            driver: globalActiveTrips[tripId].driver
+            driver: globalActiveTrips[tripId].driver,
+            offerPrice: globalActiveTrips[tripId].offerPrice || null
         });
     }
     
     const pendingTrip = globalTripOffers.find(t => t.id === tripId);
     if (pendingTrip) {
-        return res.json({ status: 'pendiente', driver: null });
+        if (pendingTrip.counterOffer) {
+            return res.json({
+                status: 'contraoferta',
+                driver: pendingTrip.counterOffer.driverName,
+                counterOffer: pendingTrip.counterOffer,
+                offerPrice: pendingTrip.offerPrice || null
+            });
+        }
+        return res.json({
+            status: 'pendiente',
+            driver: null,
+            offerPrice: pendingTrip.offerPrice || null
+        });
     }
     
     return res.status(404).json({ message: "Viaje no encontrado" });
@@ -2265,10 +2648,11 @@ app.get("/api/profile/:email/photo", async (req, res) => {
 
 // Ruta para logout
 app.post("/api/logout", (req, res) => {
-    const userEmail = req.headers['user-email'];
+    const userEmail = normalizeEmail(req.headers['user-email']);
     if (userEmail) {
         driverLocations.delete(userEmail);
         passengerLocations.delete(userEmail);
+        activeSessions.delete(userEmail);
         appStatistics.activeUsers = Math.max(0, appStatistics.activeUsers - 1);
     }
     res.json({ success: true, message: "Sesión cerrada" });

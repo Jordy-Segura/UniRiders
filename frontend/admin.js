@@ -13,6 +13,7 @@ function isGmailEmail(email) {
 }
 
 let adminMap;
+let adminInfoWindow;
 const driverMarkers = new Map();
 let adminEmail = '';
 let adminName = '';
@@ -38,6 +39,17 @@ const kpiActiveUsersValue = document.getElementById('kpiActiveUsersValue');
 const kpiCompletedTodayValue = document.getElementById('kpiCompletedTodayValue');
 const kpiCompletedTodayInfo = document.getElementById('kpiCompletedTodayInfo');
 const kpiEarningsValue = document.getElementById('kpiEarningsValue');
+const analyticsActiveTrips = document.getElementById('analyticsActiveTrips');
+const analyticsActiveTripsMeta = document.getElementById('analyticsActiveTripsMeta');
+const analyticsCompletedTrips = document.getElementById('analyticsCompletedTrips');
+const analyticsCompletedTripsMeta = document.getElementById('analyticsCompletedTripsMeta');
+const analyticsCompletionRate = document.getElementById('analyticsCompletionRate');
+const analyticsCompletionBar = document.getElementById('analyticsCompletionBar');
+const analyticsTotalUsers = document.getElementById('analyticsTotalUsers');
+const analyticsActiveUsersMeta = document.getElementById('analyticsActiveUsersMeta');
+const analyticsBusyDrivers = document.getElementById('analyticsBusyDrivers');
+const analyticsAvailableDriversMeta = document.getElementById('analyticsAvailableDriversMeta');
+const analyticsAvgTicket = document.getElementById('analyticsAvgTicket');
 
 function showToast(message, success = true) {
     const toast = document.getElementById('toast');
@@ -65,13 +77,34 @@ function baseHeaders(includeJson = true) {
     return headers;
 }
 
-function initializeMap() {
-    if (adminMap) return;
+function loadGoogleMapsScript(callbackName) {
+    if (window.google && window.google.maps) {
+        window[callbackName]();
+        return;
+    }
 
-    adminMap = L.map('adminMap').setView([-1.65962, -78.67638], 13);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(adminMap);
+    const existingScript = document.querySelector('script[data-google-maps]');
+    if (existingScript) return;
+
+    const apiKey = document.body.dataset.googleMapsKey || window.GOOGLE_MAPS_API_KEY || '';
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=${callbackName}`;
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleMaps = 'true';
+    document.head.appendChild(script);
+}
+
+function initializeMap() {
+    if (adminMap || !window.google || !window.google.maps) return;
+
+    adminMap = new google.maps.Map(document.getElementById('adminMap'), {
+        center: { lat: -1.65962, lng: -78.67638 },
+        zoom: 13,
+        mapTypeControl: false,
+        streetViewControl: false
+    });
+    adminInfoWindow = new google.maps.InfoWindow();
 
     loadDriverLocations();
     setInterval(loadDriverLocations, 15000);
@@ -102,29 +135,40 @@ async function loadDriverLocations() {
             activeEmails.add(driver.email);
 
             if (!driverMarkers.has(driver.email)) {
-                const marker = L.circleMarker([driver.lat, driver.lon], {
-                    radius: 9,
-                    color: driver.available ? '#22c55e' : '#ef4444',
-                    fillColor: driver.available ? '#22c55e' : '#ef4444',
-                    fillOpacity: 0.9,
-                    weight: 2
-                }).addTo(adminMap);
-                marker.bindPopup(formatDriverPopup(driver));
+                const marker = new google.maps.Marker({
+                    position: { lat: driver.lat, lng: driver.lon },
+                    map: adminMap,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: driver.available ? '#22c55e' : '#ef4444',
+                        fillOpacity: 0.9,
+                        strokeColor: driver.available ? '#22c55e' : '#ef4444',
+                        strokeWeight: 2
+                    }
+                });
+                marker.addListener('click', () => {
+                    adminInfoWindow.setContent(formatDriverPopup(driver));
+                    adminInfoWindow.open(adminMap, marker);
+                });
                 driverMarkers.set(driver.email, marker);
             } else {
                 const marker = driverMarkers.get(driver.email);
-                marker.setLatLng([driver.lat, driver.lon]);
-                marker.setStyle({
-                    color: driver.available ? '#22c55e' : '#ef4444',
-                    fillColor: driver.available ? '#22c55e' : '#ef4444'
+                marker.setPosition({ lat: driver.lat, lng: driver.lon });
+                marker.setIcon({
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: driver.available ? '#22c55e' : '#ef4444',
+                    fillOpacity: 0.9,
+                    strokeColor: driver.available ? '#22c55e' : '#ef4444',
+                    strokeWeight: 2
                 });
-                marker.setPopupContent(formatDriverPopup(driver));
             }
         });
 
         driverMarkers.forEach((marker, email) => {
             if (!activeEmails.has(email)) {
-                adminMap.removeLayer(marker);
+                marker.setMap(null);
                 driverMarkers.delete(email);
             }
         });
@@ -309,9 +353,21 @@ async function refreshAdminStats() {
             if (kpiActiveUsersValue) {
                 kpiActiveUsersValue.textContent = stats.activeUsers ?? 0;
             }
+            if (analyticsTotalUsers) {
+                analyticsTotalUsers.textContent = stats.totalUsers ?? 0;
+            }
+            if (analyticsActiveUsersMeta) {
+                analyticsActiveUsersMeta.textContent = `Activos: ${stats.activeUsers ?? 0}`;
+            }
+            if (analyticsActiveTrips) {
+                analyticsActiveTrips.textContent = stats.activeTrips ?? 0;
+            }
             const completedToday = stats.completedToday ?? stats.completedTrips ?? 0;
             if (kpiCompletedTodayValue) {
                 kpiCompletedTodayValue.textContent = completedToday;
+            }
+            if (analyticsCompletedTrips) {
+                analyticsCompletedTrips.textContent = stats.completedTrips ?? completedToday;
             }
             if (kpiCompletedTodayInfo && stats.syncedAt) {
                 const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
@@ -320,12 +376,38 @@ async function refreshAdminStats() {
             if (kpiEarningsValue) {
                 kpiEarningsValue.textContent = currencyFormatter.format(Number(stats.totalEarnings || 0));
             }
+            if (analyticsActiveTripsMeta && stats.syncedAt) {
+                const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                analyticsActiveTripsMeta.textContent = `Actualizado ${formatted}`;
+            }
+            if (analyticsCompletedTripsMeta && stats.syncedAt) {
+                const formatted = new Date(stats.syncedAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' });
+                analyticsCompletedTripsMeta.textContent = `Actualizado ${formatted}`;
+            }
+            if (analyticsCompletionRate && analyticsCompletionBar) {
+                const total = (stats.completedTrips ?? 0) + (stats.activeTrips ?? 0);
+                const rate = total > 0 ? Math.round(((stats.completedTrips ?? 0) / total) * 100) : 0;
+                analyticsCompletionRate.textContent = `${rate}%`;
+                analyticsCompletionBar.style.width = `${rate}%`;
+            }
+            if (analyticsAvgTicket) {
+                const completedTrips = Number(stats.completedTrips ?? 0);
+                const earnings = Number(stats.totalEarnings ?? 0);
+                const avg = completedTrips > 0 ? earnings / completedTrips : 0;
+                analyticsAvgTicket.textContent = currencyFormatter.format(avg);
+            }
         }
 
         if (driversRes.ok) {
             const driverData = await driversRes.json();
             if (kpiActiveDriversValue) {
                 kpiActiveDriversValue.textContent = driverData.available ?? driverData.count ?? 0;
+            }
+            if (analyticsBusyDrivers) {
+                analyticsBusyDrivers.textContent = driverData.busy ?? 0;
+            }
+            if (analyticsAvailableDriversMeta) {
+                analyticsAvailableDriversMeta.textContent = `Disponibles: ${driverData.available ?? 0}`;
             }
             if (kpiActiveDriversInfo) {
                 const formatted = driverData.lastUpdated
@@ -459,17 +541,16 @@ function focusEmergencyOnMap(lat, lon) {
     const numericLon = parseFloat(lon);
     if (Number.isNaN(numericLat) || Number.isNaN(numericLon)) return;
 
-    adminMap.setView([numericLat, numericLon], 16);
-    const pulseMarker = L.circleMarker([numericLat, numericLon], {
-        radius: 12,
-        color: '#f97316',
-        fillColor: '#fb923c',
-        fillOpacity: 0.8,
-        weight: 2
-    }).addTo(adminMap);
+    adminMap.setCenter({ lat: numericLat, lng: numericLon });
+    adminMap.setZoom(16);
+    const pulseMarker = new google.maps.Marker({
+        position: { lat: numericLat, lng: numericLon },
+        map: adminMap,
+        animation: google.maps.Animation.BOUNCE
+    });
 
     setTimeout(() => {
-        adminMap.removeLayer(pulseMarker);
+        pulseMarker.setMap(null);
     }, 8000);
 }
 
@@ -659,7 +740,10 @@ function bootstrapAdminPanel() {
         adminEmailEl.textContent = adminEmail;
     }
 
-    initializeMap();
+    window.initAdminMaps = () => {
+        initializeMap();
+    };
+    loadGoogleMapsScript('initAdminMaps');
     attachEventListeners();
     updateManualUserPasswordRequirement();
     loadUsers();
@@ -668,7 +752,7 @@ function bootstrapAdminPanel() {
     refreshAdminStats();
 
     setInterval(loadEmergencies, 20000);
-    adminStatsInterval = setInterval(refreshAdminStats, 15000);
+    adminStatsInterval = setInterval(refreshAdminStats, 10000);
 }
 
 document.addEventListener('DOMContentLoaded', bootstrapAdminPanel);
