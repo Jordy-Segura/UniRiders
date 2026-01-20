@@ -124,6 +124,37 @@ body.admin-body {
     padding: 0 clamp(1rem, 4vw, 3rem) 3rem;
 }
 
+.admin-section {
+    display: grid;
+    gap: 1rem;
+}
+
+.admin-section__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0 0.5rem;
+    color: #e2e8f0;
+}
+
+.admin-section__header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #f8fafc;
+}
+
+.admin-section__header p {
+    margin: 0.35rem 0 0;
+    color: rgba(226, 232, 240, 0.7);
+    font-size: 0.9rem;
+}
+
+.admin-section__content {
+    display: grid;
+    gap: 1rem;
+}
+
 .admin-column {
     flex: 1;
     min-width: 320px;
