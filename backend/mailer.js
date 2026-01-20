@@ -1,5 +1,8 @@
 const nodemailer = require("nodemailer");
 
+const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
+console.log("RESEND_FROM =", process.env.RESEND_FROM);
+
 function normalizeEmailValue(value) {
     return value ? String(value).trim().toLowerCase() : '';
 }
@@ -60,10 +63,7 @@ async function sendRecoveryMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: {
-                name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
-            },
+            from: FROM,
             to: to,
             subject: `Código de Verificación UniRiders - ${code}`,
             text: `Tu código de verificación para UniRiders es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
@@ -176,10 +176,7 @@ async function sendAdminLoginMail(to, code) {
         recentEmails.set(to, now);
 
         const mailOptions = {
-            from: {
-                name: 'UniRiders ESPOCH',
-                address: 'jordy.segura@espoch.edu.ec'
-            },
+            from: FROM,
             to,
             subject: `Código de acceso administrador - ${code}`,
             text: `Tu código de acceso administrador es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,

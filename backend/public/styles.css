@@ -1,0 +1,774 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap');
+
+/* =========================================================
+   VARIABLES GLOBALES Y ESTILOS BASE
+   ========================================================= */
+:root {
+  --color-azul: #0072ff;
+  --color-celeste: #00c6ff;
+  --color-verde-vibrante: #00c600;
+  --color-fondo: #f2f8ff;
+  --color-blanco: #fff;
+  --color-gris: #e0e0e0;
+  --color-gris-claro: #f0f0f0;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Poppins', sans-serif;
+}
+
+body {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--color-azul), var(--color-celeste));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 0;
+  transition: background 0.6s ease;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 18px;
+  right: 22px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 50%;
+  width: 52px;
+  height: 52px;
+  cursor: pointer;
+  font-size: 1.3em;
+  color: #ffffff;
+  backdrop-filter: blur(10px);
+  transition: transform 0.3s ease, background 0.3s ease;
+  z-index: 1000;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.08) rotate(-12deg);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.theme-toggle.is-dark {
+  background: rgba(30, 30, 30, 0.35);
+  color: #ffe066;
+}
+
+.floating-illustration {
+  position: fixed;
+  pointer-events: none;
+  z-index: -1;
+  inset: auto 10% 8% auto;
+  width: clamp(180px, 26vw, 320px);
+  height: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.75;
+  animation: scooterFloat 10s ease-in-out infinite;
+}
+
+.floating-illustration--left {
+  inset: 12% auto auto 8%;
+}
+
+.floating-illustration--mini {
+  width: clamp(140px, 18vw, 220px);
+}
+
+body.dark-mode .floating-illustration .fa-motorcycle {
+  color: rgba(127, 208, 255, 0.75);
+  text-shadow: 0 18px 32px rgba(0, 0, 0, 0.65);
+}
+
+.floating-illustration .fa-motorcycle {
+  font-size: clamp(5rem, 8vw, 8rem);
+  color: rgba(255, 255, 255, 0.65);
+  text-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  animation: scooterDrift 4s ease-in-out infinite alternate;
+}
+
+@keyframes scooterFloat {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-18px) rotate(3deg); }
+}
+
+@keyframes scooterDrift {
+  0% { transform: translateX(-10px); }
+  100% { transform: translateX(10px); }
+}
+
+.animated-ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  animation: ripple 12s linear infinite;
+  opacity: 0.7;
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.9); opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+/* =========================================================
+   SECCIÓN 1: LOGIN / REGISTRO
+   ========================================================= */
+.auth-container {
+  max-width: 380px;
+  width: 90%;
+  text-align: center;
+}
+
+.logo {
+  color: var(--color-blanco);
+  margin-bottom: 20px;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* --- TARJETA PRINCIPAL --- */
+.auth-card {
+  background: var(--color-blanco);
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  position: relative;
+  min-height: 400px;
+}
+
+.auth-card p {
+  color: #555;
+  margin-bottom: 20px;
+}
+
+/* --- INPUTS --- */
+.auth-card .input-container {
+  display: flex;
+  align-items: center;
+  background: var(--color-gris-claro);
+  border-radius: 10px;
+  margin-bottom: 15px;
+  padding: 0 10px;
+  transition: 0.3s;
+}
+
+.auth-card .input-container:focus-within {
+  box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.3);
+  background: var(--color-blanco);
+}
+
+.auth-card .input-container .icon {
+  color: var(--color-azul);
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.auth-card .input-container input {
+  flex-grow: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  outline: none;
+  font-size: 14px;
+}
+
+/* --- BOTÓN SWITCH --- */
+.button-switcher {
+  display: flex;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  margin-bottom: 15px;
+  padding: 5px;
+}
+
+.button-switcher button {
+  flex-grow: 1;
+  border: none;
+  background: transparent;
+  color: var(--color-blanco);
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.button-switcher button.active {
+  background: var(--color-blanco);
+  color: var(--color-azul);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* --- BOTÓN SUBMIT --- */
+.auth-card .submit-btn {
+  background: linear-gradient(90deg, var(--color-azul), var(--color-celeste));
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+  width: 100%;
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.auth-card .submit-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 5px 15px rgba(0, 114, 255, 0.4);
+}
+
+/* --- FORMULARIOS --- */
+.auth-form {
+  position: absolute;
+  top: 30px;
+  left: 30px;
+  right: 30px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.auth-form.active {
+  opacity: 1;
+  pointer-events: auto;
+  position: relative;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+/* --- ENLACES --- */
+.forgot-link {
+  display: block;
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-azul);
+  margin-bottom: 15px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-link:hover {
+  color: #0056b3;
+}
+
+/* --- SELECTOR DE ROL --- */
+.role-selector {
+  display: flex;
+  justify-content: space-around;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.role-option {
+  display: block;
+  flex-grow: 1;
+  position: relative;
+}
+
+.role-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.role-option__content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid var(--color-gris-claro);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  background-color: var(--color-blanco);
+  width: 100%;
+}
+
+.role-option input[type="radio"]:checked + .role-option__content {
+  border-color: var(--color-azul);
+  background-color: var(--color-fondo);
+  color: var(--color-azul);
+  box-shadow: 0 4px 12px rgba(0, 114, 255, 0.15);
+}
+
+.role-option input[type="radio"]:focus-visible + .role-option__content {
+  outline: 3px solid rgba(0, 114, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.role-option__content i {
+  color: #888;
+  transition: color 0.3s ease;
+}
+
+.role-option input[type="radio"]:checked + .role-option__content i {
+  color: var(--color-verde-vibrante);
+}
+
+/* =========================================================
+   SECCIÓN 2: PERFIL / EDITAR PERFIL
+   ========================================================= */
+.profile-card {
+  background: var(--color-blanco);
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.4s ease;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+}
+
+.profile-card:hover {
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  transform: translateY(-5px);
+}
+
+/* --- FOTO DE PERFIL --- */
+.profile-photo-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 4px solid var(--color-verde-vibrante);
+}
+
+#profile-pic {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: 0.3s ease;
+}
+
+/* --- BOTÓN DE SUBIR FOTO --- */
+.upload-button {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 40px;
+  height: 40px;
+  background: var(--color-verde-vibrante);
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  color: white;
+  font-size: 18px;
+  transition: 0.3s ease;
+}
+
+.upload-button:hover {
+  background: #009900;
+  transform: scale(1.1);
+}
+
+/* --- INPUTS DEL PERFIL --- */
+.profile-card .input-container {
+  display: flex;
+  align-items: center;
+  background: var(--color-gris-claro);
+  border-radius: 10px;
+  margin-bottom: 15px;
+  padding: 0 10px;
+  transition: 0.3s;
+}
+
+.profile-card .input-container:focus-within {
+  box-shadow: 0 0 0 3px rgba(0, 114, 255, 0.3);
+  background: var(--color-blanco);
+}
+
+.profile-card .input-container .icon {
+  color: var(--color-azul);
+  margin-right: 10px;
+  font-size: 16px;
+}
+
+.profile-card .input-container input,
+.profile-card .input-container select {
+  flex-grow: 1;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  outline: none;
+  font-size: 14px;
+}
+
+/* --- CAMPOS AGRUPADOS --- */
+.field-group {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.field-group .input-container {
+  flex-grow: 1;
+  margin-bottom: 0;
+}
+
+/* --- BOTÓN GUARDAR PERFIL --- */
+.profile-card .submit-btn {
+  background: linear-gradient(90deg, var(--color-azul), var(--color-celeste));
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.3s, transform 0.2s, box-shadow 0.3s;
+  width: 100%;
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-card .submit-btn:hover {
+  transform: scale(1.02);
+  box-shadow: 0 5px 15px rgba(0, 114, 255, 0.4);
+}
+
+/* =========================================================
+   TOAST (NOTIFICACIONES COMPARTIDAS)
+   ========================================================= */
+.toast {
+  visibility: hidden;
+  min-width: 250px;
+  margin-left: -125px;
+  color: #fff;
+  text-align: center;
+  border-radius: 10px;
+  padding: 16px;
+  position: fixed;
+  z-index: 1;
+  left: 50%;
+  bottom: 30px;
+  font-size: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.toast.show {
+  visibility: visible;
+  animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+@keyframes fadein {
+  from { bottom: 0; opacity: 0; }
+  to { bottom: 30px; opacity: 1; }
+}
+
+@keyframes fadeout {
+  from { bottom: 30px; opacity: 1; }
+  to { bottom: 0; opacity: 0; }
+}
+
+
+/* Agregar estas reglas al final del archivo styles.css */
+
+/* =========================================================
+   MEJORAS ESTÉTICAS GLOBALES
+   ========================================================= */
+
+/* Modo oscuro */
+body.dark-mode {
+    --color-azul: #0056cc;
+    --color-celeste: #0099cc;
+    --color-fondo: #1a1a1a;
+    --color-blanco: #2d2d2d;
+    --color-gris: #404040;
+    --color-gris-claro: #333333;
+    background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+}
+
+body.dark-mode .auth-card,
+body.dark-mode .profile-card {
+    background: rgba(45, 45, 45, 0.9);
+    color: #e0e0e0;
+}
+
+body.dark-mode .input-container {
+    background: rgba(64, 64, 64, 0.5);
+}
+
+body.dark-mode .input-container input,
+body.dark-mode .input-container select {
+    color: #e0e0e0;
+}
+
+body.dark-mode .role-option__content {
+    background: rgba(45, 45, 45, 0.8);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+}
+
+body.dark-mode .role-option input[type="radio"]:checked + .role-option__content {
+    background: rgba(0, 114, 255, 0.2);
+    border-color: var(--color-azul);
+    color: #7fb8ff;
+}
+
+body.dark-mode .live-stats {
+    background: rgba(0, 0, 0, 0.35);
+    color: #e0e0e0;
+}
+
+/* Efectos de glassmorphism mejorados */
+.glass-effect {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Animaciones de entrada */
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Efectos de hover mejorados */
+.submit-btn, .search-btn, .status-btn, .accept-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.submit-btn::before, .search-btn::before, .status-btn::before, .accept-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.submit-btn:hover::before, .search-btn:hover::before, .status-btn:hover::before, .accept-btn:hover::before {
+    left: 100%;
+}
+
+/* Notificaciones mejoradas */
+.toast {
+    border-radius: 25px;
+    font-weight: 600;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+}
+
+/* Mejoras en los inputs */
+.input-container {
+    transition: all 0.3s ease;
+}
+
+.input-container:focus-within {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 114, 255, 0.2);
+}
+
+/* Efectos de carga */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Mejoras en las tarjetas */
+.offer-card, .driver-info-panel {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.offer-card:hover, .driver-info-panel:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+/* Badges de estado */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.7em;
+    font-weight: 600;
+    margin-left: 8px;
+}
+
+.status-online {
+    background: #4CAF50;
+    color: white;
+}
+
+.status-offline {
+    background: #ff4444;
+    color: white;
+}
+
+.status-busy {
+    background: #ffaa00;
+    color: white;
+}
+
+/* Mejoras en el scroll */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+/* Efectos de pulso para notificaciones */
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Mejoras en los botones de redes sociales */
+.social-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.social-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.social-btn:hover {
+    transform: translateY(-3px);
+    background: rgba(255,255,255,0.2);
+}
+
+/* Efectos de gradiente animado */
+.animated-gradient {
+    background: linear-gradient(-45deg, #0072ff, #00c6ff, #0072ff, #00c6ff);
+    background-size: 400% 400%;
+    animation: gradient 15s ease infinite;
+}
+
+@keyframes gradient {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Mejoras en los tooltips */
+.tooltip {
+    position: relative;
+    cursor: help;
+}
+
+.tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.tooltip:hover::after {
+    opacity: 1;
+}
+
+/* Estilos para el formulario de verificación */
+#verificationForm {
+  display: none;
+}
+
+#verificationForm.active {
+  display: block;
+}
+
+.small-btn {
+  padding: 10px 15px !important;
+  font-size: 0.9em !important;
+}
+
+/* Mejoras visuales para validación de correo */
+.input-container input:invalid {
+  border-color: #ff4444;
+}
+
+.email-hint {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 5px;
+  text-align: center;
+}
