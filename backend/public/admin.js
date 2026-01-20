@@ -45,6 +45,11 @@ const analyticsCompletedTrips = document.getElementById('analyticsCompletedTrips
 const analyticsCompletedTripsMeta = document.getElementById('analyticsCompletedTripsMeta');
 const analyticsCompletionRate = document.getElementById('analyticsCompletionRate');
 const analyticsCompletionBar = document.getElementById('analyticsCompletionBar');
+const analyticsTotalUsers = document.getElementById('analyticsTotalUsers');
+const analyticsActiveUsersMeta = document.getElementById('analyticsActiveUsersMeta');
+const analyticsBusyDrivers = document.getElementById('analyticsBusyDrivers');
+const analyticsAvailableDriversMeta = document.getElementById('analyticsAvailableDriversMeta');
+const analyticsAvgTicket = document.getElementById('analyticsAvgTicket');
 
 function showToast(message, success = true) {
     const toast = document.getElementById('toast');
@@ -348,6 +353,12 @@ async function refreshAdminStats() {
             if (kpiActiveUsersValue) {
                 kpiActiveUsersValue.textContent = stats.activeUsers ?? 0;
             }
+            if (analyticsTotalUsers) {
+                analyticsTotalUsers.textContent = stats.totalUsers ?? 0;
+            }
+            if (analyticsActiveUsersMeta) {
+                analyticsActiveUsersMeta.textContent = `Activos: ${stats.activeUsers ?? 0}`;
+            }
             if (analyticsActiveTrips) {
                 analyticsActiveTrips.textContent = stats.activeTrips ?? 0;
             }
@@ -379,12 +390,24 @@ async function refreshAdminStats() {
                 analyticsCompletionRate.textContent = `${rate}%`;
                 analyticsCompletionBar.style.width = `${rate}%`;
             }
+            if (analyticsAvgTicket) {
+                const completedTrips = Number(stats.completedTrips ?? 0);
+                const earnings = Number(stats.totalEarnings ?? 0);
+                const avg = completedTrips > 0 ? earnings / completedTrips : 0;
+                analyticsAvgTicket.textContent = currencyFormatter.format(avg);
+            }
         }
 
         if (driversRes.ok) {
             const driverData = await driversRes.json();
             if (kpiActiveDriversValue) {
                 kpiActiveDriversValue.textContent = driverData.available ?? driverData.count ?? 0;
+            }
+            if (analyticsBusyDrivers) {
+                analyticsBusyDrivers.textContent = driverData.busy ?? 0;
+            }
+            if (analyticsAvailableDriversMeta) {
+                analyticsAvailableDriversMeta.textContent = `Disponibles: ${driverData.available ?? 0}`;
             }
             if (kpiActiveDriversInfo) {
                 const formatted = driverData.lastUpdated

@@ -1413,7 +1413,13 @@
         // Estadísticas del conductor con datos reales
         async function showDriverStats() {
             try {
-                const res = await fetch(`${API}/stats/driver/${userEmail}`);
+                const res = await fetch(`${API}/stats/driver/${userEmail}`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole || 'conductor',
+                        'session-id': sessionId || ''
+                    }
+                });
                 const stats = await res.json();
 
                 document.getElementById('completedTrips').textContent = stats.completedTrips;

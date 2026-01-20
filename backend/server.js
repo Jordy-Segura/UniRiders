@@ -92,7 +92,8 @@ function isOpenSessionRoute(req) {
     if (req.method === 'GET' && (
         req.path === '/api/system/time' ||
         req.path === '/api/stats/overview' ||
-        req.path === '/api/drivers/active'
+        req.path === '/api/drivers/active' ||
+        (req.path.startsWith('/api/profile/') && req.path.endsWith('/photo'))
     )) return true;
 
     return false;

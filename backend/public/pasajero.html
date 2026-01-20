@@ -2616,7 +2616,13 @@
         async function updatePassengerAchievementBadge() {
             if (!userEmail) return;
             try {
-                const res = await fetch(`${API}/profile/${userEmail}`);
+                const res = await fetch(`${API}/profile/${userEmail}`, {
+                    headers: {
+                        'user-email': userEmail,
+                        'user-role': userRole || 'pasajero',
+                        'session-id': sessionId || ''
+                    }
+                });
                 if (!res.ok) return;
                 const data = await res.json();
                 const badge = document.querySelector('.achievement-badge');
