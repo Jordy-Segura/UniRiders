@@ -1,6 +1,9 @@
 // backend/mailer.js
 const { Resend } = require("resend");
 
+const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
+console.log("RESEND_FROM =", process.env.RESEND_FROM);
+
 function normalizeEmailValue(value) {
   return value ? String(value).trim().toLowerCase() : "";
 }
@@ -36,26 +39,31 @@ async function sendEmail({ to, subject, text, html }) {
 }
 
 async function sendRecoveryMail(to, code) {
-  try {
-    if (!isAllowedRecipient(to)) {
-      console.log("❌ Correo no autorizado para notificaciones:", to);
-      return false;
-    }
+    try {
+        // Verificar que sea correo ESPOCH
+        if (!isAllowedRecipient(to)) {
+            console.log('❌ Correo no autorizado para notificaciones:', to);
+            return false;
+        }
 
-    const now = Date.now();
-    const lastSent = recentEmails.get(to);
-    if (lastSent && now - lastSent < RATE_LIMIT_MS) {
-      console.log("⏰ Rate limit alcanzado para:", to);
-      return false;
-    }
-    recentEmails.set(to, now);
+        // Verificar rate limiting
+        const now = Date.now();
+        const lastSent = recentEmails.get(to);
+        
+        if (lastSent && (now - lastSent) < RATE_LIMIT_MS) {
+            console.log('⏰ Rate limit alcanzado para:', to);
+            return false;
+        }
+        
+        recentEmails.set(to, now);
 
-    const subject = `Código de Verificación UniRiders - ${code}`;
-    const text =
-      `Tu código de verificación para UniRiders es: ${code}\n\n` +
-      `Este código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`;
-
-    const html = `<!DOCTYPE html>
+        const mailOptions = {
+            from: FROM,
+            to: to,
+            subject: `Código de Verificación UniRiders - ${code}`,
+            text: `Tu código de verificación para UniRiders es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
+            html: `
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -132,12 +140,79 @@ async function sendVerificationMail(to, code) {
 }
 
 async function sendAdminLoginMail(to, code) {
-  try {
-    const normalized = normalizeEmailValue(to);
-    if (!normalized.endsWith("@gmail.com")) {
-      console.log("❌ Correo de administrador no válido (debe ser Gmail):", to);
-      return false;
-    }
+    try {
+        const normalized = normalizeEmailValue(to);
+
+        if (!normalized.endsWith('@gmail.com')) {
+            console.log('❌ Correo de administrador no válido (debe ser Gmail):', to);
+            return false;
+        }
+
+        const now = Date.now();
+        const lastSent = recentEmails.get(to);
+
+        if (lastSent && (now - lastSent) < RATE_LIMIT_MS) {
+            console.log('⏰ Rate limit alcanzado para acceso administrador:', to);
+            return false;
+        }
+
+        recentEmails.set(to, now);
+
+        const mailOptions = {
+            from: FROM,
+            to,
+            subject: `Código de acceso administrador - ${code}`,
+            text: `Tu código de acceso administrador es: ${code}\n\nEste código expira en 10 minutos.\n\nSi no solicitaste este código, ignora este mensaje.`,
+            html: `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f8f9fa; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 1px solid #e1e5e9; }
+        .header { background: linear-gradient(135deg, #111827, #1f2937); padding: 25px 20px; text-align: center; color: white; }
+        .content { padding: 25px 20px; }
+        .code-box { background: #f3f4f6; padding: 20px; border-radius: 6px; border: 2px solid #1f2937; text-align: center; margin: 20px 0; }
+        .footer { background: #f9fafb; padding: 15px; text-align: center; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; }
+        .warning { background: #e0f2fe; border: 1px solid #0284c7; border-radius: 4px; padding: 15px; margin: 20px 0; color: #0c4a6e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo" style="font-size: 24px; font-weight: bold;">🛡️ Acceso Administrador</div>
+            <p style="margin: 5px 0 0 0; opacity: 0.85;">UniRiders - Centro de control</p>
+        </div>
+        <div class="content">
+            <p style="color: #1f2937; text-align: center; font-size: 16px; line-height: 1.5;">
+                Utiliza el siguiente código de un solo uso para ingresar al panel administrativo:
+            </p>
+            <div class="code-box">
+                <div style="font-size: 14px; color: #6b7280; margin-bottom: 8px;">CÓDIGO DE ACCESO</div>
+                <h1 style="margin: 0; color: #111827; font-size: 32px; letter-spacing: 6px; font-weight: 600; font-family: 'Consolas', monospace;">${code}</h1>
+            </div>
+            <div class="warning">
+                <p style="margin: 0; font-size: 14px; line-height: 1.5;">
+                    • Vigencia: 10 minutos<br>
+                    • No compartas este código con nadie<br>
+                    • Si no solicitaste el acceso, comunícate con soporte
+                </p>
+            </div>
+        </div>
+        <div class="footer">
+            © 2024 UniRiders - Acceso exclusivo para personal autorizado
+        </div>
+    </div>
+</body>
+</html>`
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+        console.log('✅ Código administrador enviado:', info.messageId);
+
+        setTimeout(() => {
+            recentEmails.delete(to);
+        }, 60 * 60 * 1000);
 
     const now = Date.now();
     const lastSent = recentEmails.get(to);
