@@ -1416,6 +1416,7 @@ app.post("/api/trips/request", async (req, res) => {
             .input("origen", sql.NVarChar, origin)
             .input("destino", sql.NVarChar, destination)
             .input("metodo_pago", sql.NVarChar, paymentMethod || 'Efectivo')
+            .input("costo", sql.Decimal(10, 2), fareValue)
             .execute('sp_RegistrarViaje');
 
         if (result.recordset?.length) {
