@@ -182,6 +182,14 @@ body {
     outline: none;
 }
 
+@media (max-width: 520px) {
+    .search-form input,
+    .search-form select,
+    .chat-input-group input {
+        font-size: 16px;
+    }
+}
+
 .driver-info-panel {
     background: rgba(0, 0, 0, 0.2);
     padding: 15px;

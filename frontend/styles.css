@@ -37,6 +37,32 @@ body {
   align-items: center;
   padding: 20px 0;
   transition: background 0.6s ease;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* =========================================================
+   EFECTOS DE FONDO Y ELEMENTOS DE LA LANDING
+   ========================================================= */
+.particles {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, #0072ff, #00c6ff);
+}
+
+.particle {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  animation: float 15s infinite linear;
+}
+
+@keyframes float {
+  0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
 }
 
 /* =========================================================
@@ -1033,5 +1059,18 @@ body.dark-mode .live-stats {
   .auth-card .submit-btn,
   .profile-card .submit-btn {
     transform: none;
+  }
+}
+
+@media (hover: none) {
+  .auth-card .submit-btn:hover,
+  .profile-card .submit-btn:hover,
+  .search-btn:hover,
+  .status-btn:hover,
+  .accept-btn:hover,
+  .offer-card:hover,
+  .driver-info-panel:hover {
+    transform: none;
+    box-shadow: none;
   }
 }

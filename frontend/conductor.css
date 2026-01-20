@@ -199,6 +199,13 @@ body {
     color: #f1f1f1;
 }
 
+@media (max-width: 520px) {
+    .navigation-actions button,
+    .chat-input-group input {
+        font-size: 16px;
+    }
+}
+
 @media (max-width: 768px) {
     body {
         height: auto;
