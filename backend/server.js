@@ -20,16 +20,13 @@ const https = require('https');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('.'));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const storage = multer.memoryStorage();
 const upload = multer({ 
     storage: storage,
     limits: { fileSize: 2 * 1024 * 1024 }
 });
-
-const API_PORT = process.env.PORT || 3000;
-
 
 // Variables globales con datos reales
 const globalTripOffers = [];
@@ -2527,10 +2524,14 @@ ensureAdminInfrastructure();
 // Inicializar estadísticas al iniciar el servidor
 initializeStatistics();
 
-// Actualizar estadísticas periódicamente
-setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
+module.exports = app;
 
-const PORT = process.env.PORT || 3000;
-app.listen(API_PORT, () => {
-  console.log(`🚀 Servidor ejecutándose en puerto ${API_PORT}`);
-});
+if (require.main === module) {
+    // Actualizar estadísticas periódicamente
+    setInterval(updateRealTimeStats, 30 * 1000); // Cada 30 segundos
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`🚀 Servidor ejecutándose en puerto ${PORT}`);
+    });
+}
