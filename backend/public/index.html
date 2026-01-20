@@ -164,7 +164,7 @@
     <main class="landing">
         <section class="landing__intro">
             <span class="landing__pill"><i class="fas fa-comments-dollar"></i> Negocia tu tarifa en tiempo real</span>
-            <h2>Tu viaje, tu precio. Inspirado en la flexibilidad de inDrive.</h2>
+            <h2>Tu viaje, tu precio. Libertad total para negociar tu tarifa.</h2>
             <p>
                 UniRiders ahora resalta lo mejor del modelo de negociación: tú propones cuánto quieres pagar,
                 comparas respuestas y eliges a tu conductor según precio, vehículo y calificación.
@@ -296,6 +296,9 @@
                         Acepto los <a href="#" style="color: #0072ff;">términos de servicio</a> y
                         <a href="#" style="color: #0072ff;">política de privacidad</a>
                     </label>
+                    <p style="margin-top: 8px; font-size: 0.75em; color: #777;">
+                        ✔️ Uso responsable del servicio &nbsp;•&nbsp; ✔️ Cuidado de datos personales &nbsp;•&nbsp; ✔️ Normas de convivencia.
+                    </p>
                 </div>
 
                 <button type="submit" class="submit-btn">
@@ -340,27 +343,31 @@
             <form id="adminAccessForm" class="auth-form">
                 <p>🛡️ Acceso de administradores</p>
 
-                <div class="input-container">
-                    <i class="fas fa-envelope icon"></i>
-                    <input type="email" id="adminAccessEmail" placeholder="correo@gmail.com" required>
-                    <div class="input-focus-effect"></div>
+                <div class="admin-access-steps">
+                    <div class="admin-step">
+                        <h4>Paso 1 · Solicitar código</h4>
+                        <div class="input-container">
+                            <i class="fas fa-envelope icon"></i>
+                            <input type="email" id="adminAccessEmail" placeholder="correo@gmail.com" required>
+                            <div class="input-focus-effect"></div>
+                        </div>
+                        <button type="button" id="adminRequestCode" class="submit-btn">
+                            <i class="fas fa-paper-plane"></i> Enviar código de acceso
+                        </button>
+                    </div>
+
+                    <div class="admin-step">
+                        <h4>Paso 2 · Verificar código</h4>
+                        <div class="input-container">
+                            <i class="fas fa-key icon"></i>
+                            <input type="text" id="adminAccessCode" placeholder="Código de 6 dígitos" maxlength="6">
+                            <div class="input-focus-effect"></div>
+                        </div>
+                        <button type="button" id="adminVerifyCode" class="submit-btn" disabled>
+                            <i class="fas fa-unlock"></i> Verificar código
+                        </button>
+                    </div>
                 </div>
-
-                <button type="button" id="adminRequestCode" class="submit-btn">
-                    <i class="fas fa-paper-plane"></i> Enviar código de acceso
-                </button>
-
-                <hr style="margin: 20px 0; border-color: #f0f0f0;">
-
-                <div class="input-container">
-                    <i class="fas fa-key icon"></i>
-                    <input type="text" id="adminAccessCode" placeholder="Código de 6 dígitos" maxlength="6">
-                    <div class="input-focus-effect"></div>
-                </div>
-
-                <button type="button" id="adminVerifyCode" class="submit-btn" disabled>
-                    <i class="fas fa-unlock"></i> Verificar código
-                </button>
 
                 <a href="#" id="backToLoginFromAdmin" class="forgot-link" style="text-align: center; display: block; margin-top: 15px;">
                     ← Volver al inicio
