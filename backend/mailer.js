@@ -1,11 +1,10 @@
-// backend/mailer.js
+const nodemailer = require("nodemailer");
 const { Resend } = require("resend");
 
-const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
-console.log("RESEND_FROM =", process.env.RESEND_FROM);
-
-const FROM = process.env.RESEND_FROM || "UniRiders <onboarding@resend.dev>";
+const FALLBACK_FROM = "UniRiders <onboarding@resend.dev>";
+const FROM = process.env.RESEND_FROM || FALLBACK_FROM;
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 console.log("RESEND_FROM =", process.env.RESEND_FROM);
 
 function normalizeEmailValue(value) {
@@ -69,6 +68,67 @@ async function sendEmail({ to, subject, text, html }) {
 
             console.log("✅ Correo enviado (Resend):", payload.id || "OK");
             return true;
+        } catch (error) {
+            console.log("❌ Error enviando correo (Resend):", error);
+            return false;
+        }
+    }
+
+    try {
+        const info = await transporter.sendMail({
+            from: FROM,
+            to,
+            subject,
+            text,
+            html,
+            headers: {
+                'X-Priority': '1',
+                'X-MSMail-Priority': 'High',
+                'Importance': 'high'
+            }
+        });
+        console.log('✅ Correo enviado (SMTP):', info.messageId);
+        return true;
+    } catch (error) {
+        console.log('❌ Error enviando correo (SMTP):', error);
+        return false;
+    }
+}
+
+async function sendEmail({ to, subject, text, html }) {
+    if (resend) {
+        try {
+            const { data, error } = await resend.emails.send({
+                from: FROM,
+                to,
+                subject,
+                text,
+                html
+            });
+
+            if (!error) {
+                console.log("✅ Correo enviado (Resend):", data?.id || "OK");
+                return true;
+            }
+
+            console.log("❌ Error enviando correo (Resend):", error);
+            const errorMessage = typeof error === "string" ? error : JSON.stringify(error);
+            if (errorMessage.includes("domain is not verified")) {
+                const fallbackResult = await resend.emails.send({
+                    from: FALLBACK_FROM,
+                    to,
+                    subject,
+                    text,
+                    html
+                });
+                if (!fallbackResult.error) {
+                    console.log("✅ Correo enviado (Resend fallback):", fallbackResult.data?.id || "OK");
+                    return true;
+                }
+                console.log("❌ Error enviando correo (Resend fallback):", fallbackResult.error);
+            }
+
+            return false;
         } catch (error) {
             console.log("❌ Error enviando correo (Resend):", error);
             return false;
