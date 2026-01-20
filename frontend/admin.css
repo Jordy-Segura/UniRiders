@@ -145,6 +145,41 @@ body.admin-body {
     }
 }
 
+@media (max-width: 768px) {
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .admin-header__actions {
+        width: 100%;
+    }
+
+    .admin-contact {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .admin-layout {
+        padding-bottom: 2rem;
+    }
+}
+
+@media (max-width: 520px) {
+    .admin-header {
+        padding: 1.5rem 1rem;
+    }
+
+    .admin-kpi-grid {
+        padding: 0 1rem 1.5rem;
+    }
+
+    .admin-card {
+        padding: 1.25rem;
+    }
+}
+
 .admin-card {
     background: var(--admin-card-bg);
     border-radius: 1.2rem;

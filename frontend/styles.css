@@ -20,6 +20,15 @@
   font-family: 'Poppins', sans-serif;
 }
 
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
 body {
   min-height: 100vh;
   background: linear-gradient(135deg, var(--color-azul), var(--color-celeste));
@@ -958,7 +967,10 @@ body.dark-mode .live-stats {
 
 @media (max-width: 768px) {
   body {
-    padding: 16px 0;
+    padding: 16px 0 28px;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
   }
 
   .auth-card {
@@ -974,7 +986,12 @@ body.dark-mode .live-stats {
   .live-stats {
     position: static;
     width: min(92%, 360px);
-    margin: 20px auto 0;
+    margin: 0 auto;
+    order: 2;
+  }
+
+  .auth-container {
+    order: 1;
   }
 
   .floating-illustration,
